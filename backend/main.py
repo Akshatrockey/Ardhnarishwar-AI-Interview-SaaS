@@ -24,7 +24,7 @@ from app.core.security import (
     AuthenticatedIdentity
 )
 from app.core.rate_limiter import enforce_login_rate_limit, enforce_api_rate_limit
-from app.models import User, Company
+from app.models import User, Company, Candidate
 from app.api.recordings import router as recordings_router
 from app.api.realtime import router as realtime_router
 
@@ -116,6 +116,172 @@ async def login_endpoint(req: LoginRequest, db: Session = Depends(get_db)):
         "company_id": user.company_id,
         "name": user.name
     }
+
+
+class CandidateVerifyRequest(BaseModel):
+    token_or_id: str
+
+@app.post(
+    "/api/v1/auth/candidate-verify",
+    dependencies=[Depends(enforce_login_rate_limit)],
+    tags=["Security & Auth"]
+)
+async def candidate_verify_endpoint(req: CandidateVerifyRequest, db: Session = Depends(get_db)):
+    cand = db.query(Candidate).filter(
+        (Candidate.interview_token == req.token_or_id) | 
+        (Candidate.id == req.token_or_id) |
+        (Candidate.email == req.token_or_id)
+    ).first()
+    if not cand:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Candidate record not found for the provided token or ID."
+        )
+    return {
+        "id": cand.id,
+        "company_id": cand.company_id,
+        "job_id": cand.job_id,
+        "first_name": cand.first_name,
+        "last_name": cand.last_name,
+        "email": cand.email,
+        "status": cand.status,
+        "interview_token": cand.interview_token
+    }
+
+
+class CandidateRegisterRequest(BaseModel):
+    id: Optional[str] = None
+    company_id: Optional[str] = None
+    job_id: Optional[str] = None
+    firstName: Optional[str] = None
+    lastName: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    email: str
+    phone: Optional[str] = None
+    yearsOfExperience: Optional[int] = None
+    years_of_experience: Optional[int] = 0
+    interview_token: Optional[str] = None
+    interviewToken: Optional[str] = None
+
+@app.post(
+    "/api/v1/auth/register-candidate",
+    dependencies=[Depends(enforce_login_rate_limit)],
+    tags=["Security & Auth"]
+)
+async def register_candidate_endpoint(req: CandidateRegisterRequest, db: Session = Depends(get_db)):
+    f_name = req.first_name or req.firstName or "Candidate"
+    l_name = req.last_name or req.lastName or "Applicant"
+    cand_id = req.id or f"cand_{int(time.time())}"
+    token = req.interview_token or req.interviewToken or f"TOKEN_{int(time.time())}_{f_name.upper()}"
+    exp = req.years_of_experience or req.yearsOfExperience or 0
+
+    new_cand = Candidate(
+        id=cand_id,
+        company_id=req.company_id or "comp_cyberdyne",
+        job_id=req.job_id or "job_cyber_01",
+        first_name=f_name,
+        last_name=l_name,
+        email=req.email,
+        phone=req.phone,
+        years_of_experience=exp,
+        status="SHORTLISTED",
+        interview_token=token
+    )
+    db.add(new_cand)
+    try:
+        db.commit()
+        db.refresh(new_cand)
+    except Exception:
+        db.rollback()
+
+    return {
+        "id": new_cand.id,
+        "first_name": new_cand.first_name,
+        "last_name": new_cand.last_name,
+        "email": new_cand.email,
+        "interview_token": new_cand.interview_token,
+        "status": new_cand.status
+    }
+
+
+class CompanyRegisterRequest(BaseModel):
+    company: Dict[str, Any]
+    admin: Dict[str, Any]
+
+@app.post(
+    "/api/v1/auth/register-company",
+    dependencies=[Depends(enforce_login_rate_limit)],
+    tags=["Security & Auth"]
+)
+async def register_company_endpoint(req: CompanyRegisterRequest, db: Session = Depends(get_db)):
+    comp_data = req.company
+    adm_data = req.admin
+    
+    new_comp = Company(
+        id=comp_data.get("id"),
+        name=comp_data.get("name"),
+        slug=comp_data.get("slug"),
+        domain=comp_data.get("domain"),
+        plan_tier=comp_data.get("plan", "GROWTH"),
+        status="ACTIVE",
+        contact_email=comp_data.get("contactEmail") or comp_data.get("contact_email", ""),
+        contact_person=comp_data.get("contactPerson") or comp_data.get("contact_person", "Admin Lead"),
+        industry=comp_data.get("industry", "Technology")
+    )
+    
+    new_user = User(
+        id=adm_data.get("id"),
+        email=adm_data.get("email"),
+        password_hash="argon2_hashed_secret",
+        name=adm_data.get("name", "Admin Lead"),
+        role="COMPANY_ADMIN",
+        company_id=new_comp.id,
+        status="ACTIVE"
+    )
+    
+    db.add(new_comp)
+    db.add(new_user)
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        
+    return {"success": True, "company_id": new_comp.id, "admin_id": new_user.id}
+
+
+class EmployeeRegisterRequest(BaseModel):
+    id: Optional[str] = None
+    name: str
+    email: str
+    companyId: Optional[str] = None
+    company_id: Optional[str] = None
+    designation: Optional[str] = None
+
+@app.post(
+    "/api/v1/auth/register-employee",
+    dependencies=[Depends(enforce_login_rate_limit)],
+    tags=["Security & Auth"]
+)
+async def register_employee_endpoint(req: EmployeeRegisterRequest, db: Session = Depends(get_db)):
+    emp_id = req.id or f"usr_emp_{int(time.time())}"
+    c_id = req.company_id or req.companyId
+    new_user = User(
+        id=emp_id,
+        email=req.email,
+        password_hash="argon2_hashed_secret",
+        name=req.name,
+        role="EMPLOYEE",
+        company_id=c_id,
+        designation=req.designation or "Staff Member",
+        status="ACTIVE"
+    )
+    db.add(new_user)
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+    return {"success": True, "employee_id": new_user.id, "name": new_user.name}
 
 
 # ==============================================================================

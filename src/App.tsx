@@ -49,7 +49,7 @@ const AppContent: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
   const [showCandidatePortal, setShowCandidatePortal] = useState<boolean>(false);
-  const [candidateTokenForChamber, setCandidateTokenForChamber] = useState<string>('TOKEN_PRIYA_ROBOTICS_2026');
+  const [candidateTokenForChamber, setCandidateTokenForChamber] = useState<string>('');
   const [showAuthPortal, setShowAuthPortal] = useState<boolean>(false);
 
   // Modal & Video Conference State

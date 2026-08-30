@@ -36,7 +36,7 @@ interface CandidatePortalProps {
 
 export const CandidatePortal: React.FC<CandidatePortalProps> = ({
   onBackToApp,
-  initialToken = 'TOKEN_PRIYA_ROBOTICS_2026',
+  initialToken = '',
   onViewEvaluation,
 }) => {
   const { theme, toggleTheme } = useTheme();
@@ -176,7 +176,7 @@ export const CandidatePortal: React.FC<CandidatePortalProps> = ({
                   type="text"
                   value={tokenInput}
                   onChange={(e) => setTokenInput(e.target.value)}
-                  placeholder="e.g. TOKEN_PRIYA_ROBOTICS_2026"
+                  placeholder="Enter your invitation token (e.g. TOKEN_XXXX)"
                   className="w-full mt-1.5 p-3.5 rounded-xl font-mono text-sm bg-slate-950 border border-slate-800 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 text-cyan-300 font-bold outline-none uppercase tracking-wider"
                 />
               </div>

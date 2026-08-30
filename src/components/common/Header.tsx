@@ -7,6 +7,8 @@ import { useLanguage, SUPPORTED_LANGUAGES, SUPPORTED_CURRENCIES, LanguageCode, C
 import { ArdhnarishwarLogo } from './ArdhnarishwarLogo';
 import { UserProfileModal } from './UserProfileModal';
 import { ShareLinksModal } from './ShareLinksModal';
+import { AppDataStore } from '../../services/storage';
+import { User } from '../../types';
 import { 
   Building2, 
   Moon, 
@@ -71,12 +73,12 @@ export const Header: React.FC<HeaderProps> = ({
   const [showShareModal, setShowShareModal] = useState(false);
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
 
-  const personas = [
-    { id: 'usr_super_admin', label: 'Ardhnarishwar Super Admin (HQ)', role: 'SUPER_ADMIN' },
-    { id: 'usr_cyberdyne_admin', label: 'Dr. Miles Bennett (Cyberdyne Admin)', role: 'COMPANY_ADMIN' },
-    { id: 'usr_cyberdyne_recruiter', label: 'Sarah Connor (Cyberdyne Recruiter)', role: 'RECRUITER' },
-    { id: 'usr_cyberdyne_employee', label: 'Alex Mercer (Staff Robotics Engineer)', role: 'EMPLOYEE' },
-  ];
+  const users = AppDataStore.getUsers();
+  const personas: { id: string; label: string; role: string }[] = users.map((u: User) => ({
+    id: u.id,
+    label: `${u.name} (${u.role.replace(/_/g, ' ')})`,
+    role: u.role
+  }));
 
   const handleSelectPersona = (userId: string) => {
     const res = switchPersona(userId);

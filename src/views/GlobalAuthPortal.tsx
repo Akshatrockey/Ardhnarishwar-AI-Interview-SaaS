@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTenant } from '../context/TenantContext';
 import { useTheme } from '../context/ThemeContext';
-import { useLanguage, SUPPORTED_LANGUAGES, SUPPORTED_CURRENCIES, LanguageCode, CurrencyCode } from '../context/LanguageContext';
+import { useLanguage, SUPPORTED_LANGUAGES, LanguageCode } from '../context/LanguageContext';
 import { AppDataStore } from '../services/storage';
-import { Candidate, Company, User, UserRole } from '../types';
+import { authService } from '../services/authService';
+import { Candidate, UserRole } from '../types';
 import { ArdhnarishwarLogo } from '../components/common/ArdhnarishwarLogo';
 import { ShareLinksModal } from '../components/common/ShareLinksModal';
 import { 
@@ -12,21 +13,16 @@ import {
   Lock, 
   UserCheck, 
   Sparkles, 
-  Briefcase, 
-  FileText, 
   CheckCircle2, 
   ArrowRight, 
   Globe, 
-  Coins, 
-  Laptop,
   AlertCircle,
   Building2,
   Users,
   Sun,
   Moon,
-  Clock,
-  Video,
-  Share2
+  Share2,
+  Loader2
 } from 'lucide-react';
 
 interface GlobalAuthPortalProps {
@@ -41,13 +37,14 @@ export const GlobalAuthPortal: React.FC<GlobalAuthPortalProps> = ({
   initialTab = 'admin'
 }) => {
   const { switchPersona } = useAuth();
-  const { allCompanies, selectCompany } = useTenant();
+  const { allCompanies } = useTenant();
   const { theme, toggleTheme } = useTheme();
-  const { t, language, setLanguage, currency, setCurrency } = useLanguage();
+  const { language, setLanguage } = useLanguage();
 
   const [activeMainTab, setActiveMainTab] = useState<'admin' | 'candidate' | 'company_register' | 'employee_register'>(initialTab);
   const [candidateSubTab, setCandidateSubTab] = useState<'login' | 'register'>('login');
   const [showShareModal, setShowShareModal] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -67,225 +64,176 @@ export const GlobalAuthPortal: React.FC<GlobalAuthPortalProps> = ({
     }
   }, []);
 
-  // Admin form state
-  const [adminEmail, setAdminEmail] = useState<string>('admin@ardhnarishwar.ai');
-  const [adminPassword, setAdminPassword] = useState<string>('Ardhnarishwar2026!');
+  // Admin & Enterprise Login Form State (Clean defaults, zero hardcoded credentials)
+  const [adminEmail, setAdminEmail] = useState<string>('');
+  const [adminPassword, setAdminPassword] = useState<string>('');
   const [adminRole, setAdminRole] = useState<UserRole>('SUPER_ADMIN');
   const [adminError, setAdminError] = useState<string>('');
 
-  // Candidate login form
+  // Candidate Login Form State
   const [candIdInput, setCandIdInput] = useState<string>('');
-  const [candEmailInput, setCandEmailInput] = useState<string>('');
   const [candLoginError, setCandLoginError] = useState<string>('');
 
-  // Candidate register form
+  // Candidate Register Form State
   const [regName, setRegName] = useState<string>('');
   const [regEmail, setRegEmail] = useState<string>('');
   const [regPhone, setRegPhone] = useState<string>('');
   const [regJobId, setRegJobId] = useState<string>('');
-  const [regExperience, setRegExperience] = useState<number>(2);
-  const [regSkills, setRegSkills] = useState<string>('Python, ROS2, Robotics, C++');
-  const [regResumeName, setRegResumeName] = useState<string>('');
+  const [regExperience, setRegExperience] = useState<number>(0);
+  const [regSkills, setRegSkills] = useState<string>('');
   const [registeredCandidate, setRegisteredCandidate] = useState<Candidate | null>(null);
   const [regError, setRegError] = useState<string>('');
 
-  // Company Register Form
+  // Company Register Form State
   const [companyName, setCompanyName] = useState<string>('');
   const [companyDomain, setCompanyDomain] = useState<string>('');
   const [companyContactEmail, setCompanyContactEmail] = useState<string>('');
   const [companyContactPerson, setCompanyContactPerson] = useState<string>('');
-  const [companyIndustry, setCompanyIndustry] = useState<string>('Autonomous Robotics & AI');
+  const [companyIndustry, setCompanyIndustry] = useState<string>('');
   const [companySuccessMsg, setCompanySuccessMsg] = useState<string>('');
+  const [companyError, setCompanyError] = useState<string>('');
 
-  // Employee Register Form
+  // Staff Employee Register Form State
   const [empName, setEmpName] = useState<string>('');
   const [empEmail, setEmpEmail] = useState<string>('');
-  const [empCompanyId, setEmpCompanyId] = useState<string>('comp_cyberdyne');
-  const [empDesignation, setEmpDesignation] = useState<string>('Robotics Controls Engineer');
+  const [empCompanyId, setEmpCompanyId] = useState<string>('');
+  const [empDesignation, setEmpDesignation] = useState<string>('');
   const [empSuccessMsg, setEmpSuccessMsg] = useState<string>('');
+  const [empError, setEmpError] = useState<string>('');
 
   const jobs = AppDataStore.getJobs();
 
-  // Handle Admin Login
-  const handleAdminLogin = (e?: React.FormEvent) => {
+  // Handle Admin & Super Admin Login (Connected to Production Backend)
+  const handleAdminLogin = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setAdminError('');
+    setIsLoading(true);
 
-    const users = AppDataStore.getUsers();
-    let found = users.find(u => u.email.toLowerCase() === adminEmail.trim().toLowerCase());
-    
-    if (!found) {
-      found = users.find(u => u.role === adminRole) || users[0];
-    }
-
-    if (found) {
-      switchPersona(found.id);
-      onAdminLoginSuccess();
-    } else {
-      setAdminError('Invalid credentials. Please verify your enterprise email and password.');
-    }
-  };
-
-  // Quick 1-Click Persona Login
-  const handleQuickPersona = (role: UserRole, email: string) => {
-    setAdminEmail(email);
-    setAdminRole(role);
-    const users = AppDataStore.getUsers();
-    const user = users.find(u => u.role === role) || users[0];
-    if (user) {
-      switchPersona(user.id);
-      onAdminLoginSuccess();
+    try {
+      const result = await authService.login(adminEmail, adminPassword, adminRole);
+      if (result.success && result.user) {
+        switchPersona(result.user.id);
+        onAdminLoginSuccess();
+      } else {
+        setAdminError(result.message || 'Invalid credentials. Please verify your work email and password.');
+      }
+    } catch (err: any) {
+      setAdminError(err?.message || 'Authentication error. Please check server connectivity.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // Candidate Login
-  const handleCandidateLogin = (e?: React.FormEvent) => {
+  // Candidate Login (Connected to Backend Verification)
+  const handleCandidateLogin = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setCandLoginError('');
-    const candidates = AppDataStore.getCandidates();
-    
-    const found = candidates.find(c => {
-      const matchId = candIdInput ? (c.id.includes(candIdInput.trim()) || c.interviewToken.toUpperCase().includes(candIdInput.trim().toUpperCase())) : false;
-      const matchEmail = candEmailInput ? c.email.toLowerCase() === candEmailInput.trim().toLowerCase() : false;
-      return matchId || matchEmail;
-    });
+    setIsLoading(true);
 
-    if (found) {
-      onCandidateLaunchChamber(found.interviewToken);
-    } else {
-      setCandLoginError('Candidate record not found. Please verify your Candidate ID / Token or register below.');
+    try {
+      const result = await authService.verifyCandidateToken(candIdInput);
+      if (result.success && result.candidate) {
+        onCandidateLaunchChamber(result.candidate.interviewToken);
+      } else {
+        setCandLoginError(result.message || 'Candidate record not found. Please verify your Candidate ID / Token.');
+      }
+    } catch (err: any) {
+      setCandLoginError(err?.message || 'Verification error occurred.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // Candidate Registration Handler
-  const handleRegisterCandidate = (e: React.FormEvent) => {
+  // Candidate Self-Registration (Connected to Backend Endpoints)
+  const handleRegisterCandidate = async (e: React.FormEvent) => {
     e.preventDefault();
     setRegError('');
+    setIsLoading(true);
 
-    if (!regName.trim() || !regEmail.trim()) {
-      setRegError('Please provide your Full Name and Email address.');
-      return;
+    try {
+      const result = await authService.registerCandidate({
+        name: regName,
+        email: regEmail,
+        phone: regPhone,
+        jobId: regJobId,
+        yearsOfExperience: Number(regExperience) || 0,
+        skills: regSkills,
+      });
+
+      if (result.success && result.candidate) {
+        setRegisteredCandidate(result.candidate);
+      } else {
+        setRegError(result.message || 'Registration failed. Please check your details.');
+      }
+    } catch (err: any) {
+      setRegError(err?.message || 'Registration failed due to a server error.');
+    } finally {
+      setIsLoading(false);
     }
-
-    const selectedJobId = regJobId || jobs[0]?.id || 'job_cyber_01';
-    const targetJob = jobs.find(j => j.id === selectedJobId) || jobs[0];
-
-    const nameParts = regName.trim().split(' ');
-    const firstName = nameParts[0] || 'Candidate';
-    const lastName = nameParts.slice(1).join(' ') || 'Applicant';
-
-    const numericId = Math.floor(1000 + Math.random() * 9000);
-    const candidateId = `cand_${numericId}`;
-    const token = `TOKEN_${numericId}_${firstName.toUpperCase()}`;
-
-    const newCand: Candidate = {
-      id: candidateId,
-      companyId: targetJob?.companyId || 'comp_cyberdyne',
-      jobId: selectedJobId,
-      firstName,
-      lastName,
-      email: regEmail.trim(),
-      phone: regPhone.trim() || '+1 (555) 019-2834',
-      currentTitle: `${regExperience > 2 ? 'Senior' : 'Junior'} ${targetJob?.title || 'Robotics Engineer'}`,
-      yearsOfExperience: Number(regExperience),
-      status: 'SHORTLISTED',
-      interviewToken: token,
-      appliedAt: new Date().toISOString(),
-      resumeFileName: regResumeName || `${firstName}_${lastName}_Resume.pdf`,
-      skills: regSkills.split(',').map(s => s.trim()).filter(Boolean),
-      meetingRoomId: `ROOM-PANEL-${firstName.toUpperCase()}-${lastName.toUpperCase()}-2026`
-    };
-
-    const existing = AppDataStore.getCandidates();
-    AppDataStore.saveCandidates([newCand, ...existing]);
-
-    AppDataStore.logActivity({
-      companyId: newCand.companyId,
-      actorId: candidateId,
-      actorName: regName,
-      actorRole: 'CANDIDATE',
-      action: 'CANDIDATE_SELF_REGISTERED',
-      resource: `Candidate ID #${numericId} for ${targetJob?.title}`,
-      details: `Self-service application submitted with resume ${newCand.resumeFileName}. Unique token ${token} generated with direct video meeting room.`,
-      ipAddress: '127.0.0.1',
-      severity: 'INFO',
-    });
-
-    setRegisteredCandidate(newCand);
   };
 
-  // Company Registration Handler
-  const handleRegisterCompany = (e: React.FormEvent) => {
+  // Company Registration (Connected to Backend Endpoints)
+  const handleRegisterCompany = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!companyName.trim() || !companyContactEmail.trim()) return;
+    setCompanySuccessMsg('');
+    setCompanyError('');
+    setIsLoading(true);
 
-    const newCompId = `comp_${companyName.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${Math.floor(100 + Math.random() * 900)}`;
-    const newCompany: Company = {
-      id: newCompId,
-      name: companyName.trim(),
-      slug: companyName.toLowerCase().replace(/[^a-z0-9]/g, '-'),
-      domain: companyDomain.trim() || `${companyName.toLowerCase().replace(/[^a-z0-9]/g, '')}.io`,
-      plan: 'GROWTH',
-      status: 'ACTIVE',
-      maxJobs: 25,
-      maxCandidatesPerMonth: 1000,
-      createdAt: new Date().toISOString(),
-      contactEmail: companyContactEmail.trim(),
-      contactPerson: companyContactPerson.trim() || 'Admin Lead',
-      industry: companyIndustry,
-      aiCustomRulesEnabled: true,
-      recordingStorageUsedMb: 0,
-      recordingStorageQuotaMb: 10000,
-      meetingRoomId: `ROOM-${companyName.toUpperCase().replace(/[^A-Z0-9]/g, '')}-2026`
-    };
+    try {
+      const result = await authService.registerCompany({
+        name: companyName,
+        domain: companyDomain,
+        contactEmail: companyContactEmail,
+        contactPerson: companyContactPerson,
+        industry: companyIndustry,
+      });
 
-    const companies = AppDataStore.getCompanies();
-    AppDataStore.saveCompanies([newCompany, ...companies]);
-
-    // Create an Admin user for this company
-    const newAdminUser: User = {
-      id: `usr_${newCompId}_admin`,
-      email: companyContactEmail.trim(),
-      name: companyContactPerson.trim() || 'Admin Lead',
-      role: 'COMPANY_ADMIN',
-      companyId: newCompId,
-      createdAt: new Date().toISOString(),
-      status: 'ACTIVE',
-      designation: 'VP of Talent & Engineering',
-      meetingRoomId: newCompany.meetingRoomId
-    };
-
-    const users = AppDataStore.getUsers();
-    AppDataStore.saveUsers([newAdminUser, ...users]);
-
-    setCompanySuccessMsg(`Company ${newCompany.name} successfully registered! You can now log in with ${newAdminUser.email}.`);
+      if (result.success && result.company && result.adminUser) {
+        setCompanySuccessMsg(`Organization "${result.company.name}" provisioned successfully! You can now log in using ${result.adminUser.email}.`);
+        setCompanyName('');
+        setCompanyDomain('');
+        setCompanyContactEmail('');
+        setCompanyContactPerson('');
+        setCompanyIndustry('');
+      } else {
+        setCompanyError(result.message || 'Company registration failed.');
+      }
+    } catch (err: any) {
+      setCompanyError(err?.message || 'An error occurred during company registration.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  // Employee Registration Handler
-  const handleRegisterEmployee = (e: React.FormEvent) => {
+  // Staff Employee Registration (Connected to Backend Endpoints)
+  const handleRegisterEmployee = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!empName.trim() || !empEmail.trim()) return;
+    setEmpSuccessMsg('');
+    setEmpError('');
+    setIsLoading(true);
 
-    const empId = `usr_emp_${Math.floor(1000 + Math.random() * 9000)}`;
-    const newEmp: User = {
-      id: empId,
-      email: empEmail.trim(),
-      name: empName.trim(),
-      role: 'EMPLOYEE',
-      companyId: empCompanyId,
-      designation: empDesignation,
-      createdAt: new Date().toISOString(),
-      status: 'ACTIVE',
-      employeeCode: `EMP-CYBER-${Math.floor(100 + Math.random() * 900)}`,
-      totalPunchHours: 0,
-      assignedInterviewsCount: 0,
-      meetingRoomId: `ROOM-EMP-${empName.toUpperCase().replace(/[^A-Z0-9]/g, '')}-2026`
-    };
+    try {
+      const result = await authService.registerEmployee({
+        name: empName,
+        email: empEmail,
+        companyId: empCompanyId,
+        designation: empDesignation,
+      });
 
-    const users = AppDataStore.getUsers();
-    AppDataStore.saveUsers([newEmp, ...users]);
-
-    setEmpSuccessMsg(`Staff Employee ${newEmp.name} (${newEmp.employeeCode}) registered! You can now sign in.`);
+      if (result.success && result.employee) {
+        setEmpSuccessMsg(`Staff member "${result.employee.name}" (${result.employee.employeeCode}) registered! You can now log in.`);
+        setEmpName('');
+        setEmpEmail('');
+        setEmpCompanyId('');
+        setEmpDesignation('');
+      } else {
+        setEmpError(result.message || 'Employee registration failed.');
+      }
+    } catch (err: any) {
+      setEmpError(err?.message || 'An error occurred during employee registration.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -302,7 +250,7 @@ export const GlobalAuthPortal: React.FC<GlobalAuthPortalProps> = ({
           <button
             onClick={() => setShowShareModal(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-cyan-500/20 via-indigo-500/20 to-purple-500/20 text-cyan-300 border border-cyan-500/40 hover:border-cyan-400 hover:bg-cyan-500/30 transition-all shadow-sm active:scale-95"
-            title="Get 1-Click Shareable Project Links"
+            title="Get Shareable Project Links"
           >
             <Share2 className="w-3.5 h-3.5 text-cyan-400" />
             <span className="hidden sm:inline">Share Links</span>
@@ -343,13 +291,13 @@ export const GlobalAuthPortal: React.FC<GlobalAuthPortalProps> = ({
           <div className="text-center space-y-2 mb-8">
             <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-semibold">
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Next-Gen Real-Time AI Interview & Video Meeting Platform</span>
+              <span>Production AI Interview & Enterprise Workspace</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-              Ardhnarishwar Global Enterprise SaaS
+              Ardhnarishwar AI SaaS
             </h1>
             <p className="text-xs text-slate-400 max-w-md mx-auto">
-              Autonomous AI video screening, zero-bias candidate evaluation, live recruiter intercom, and Zoom-style conference meetings.
+              Secure zero-trust authentication, autonomous AI interviews, and real-time enterprise management.
             </p>
           </div>
 
@@ -364,7 +312,7 @@ export const GlobalAuthPortal: React.FC<GlobalAuthPortalProps> = ({
               }`}
             >
               <Lock className="w-3.5 h-3.5" />
-              <span>Admin & HR</span>
+              <span>Admin & Staff</span>
             </button>
 
             <button
@@ -404,7 +352,7 @@ export const GlobalAuthPortal: React.FC<GlobalAuthPortalProps> = ({
             </button>
           </div>
 
-          {/* TAB 1: ADMIN & HR LOGIN */}
+          {/* TAB 1: ADMIN & ENTERPRISE LOGIN (Super Admin & Enterprise Portal) */}
           {activeMainTab === 'admin' && (
             <div className="space-y-5 animate-in fade-in">
               {adminError && (
@@ -417,6 +365,22 @@ export const GlobalAuthPortal: React.FC<GlobalAuthPortalProps> = ({
               <form onSubmit={handleAdminLogin} className="space-y-4">
                 <div>
                   <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                    Select Target Authority Role
+                  </label>
+                  <select
+                    value={adminRole}
+                    onChange={(e) => setAdminRole(e.target.value as UserRole)}
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl px-4 py-2.5 text-xs text-white outline-none"
+                  >
+                    <option value="SUPER_ADMIN">👑 Super Admin (HQ Control Center)</option>
+                    <option value="COMPANY_ADMIN">🏢 Company Admin / HR Director</option>
+                    <option value="RECRUITER">🎯 Recruiter / Talent Lead</option>
+                    <option value="EMPLOYEE">⚙️ Staff Employee Member</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
                     Work Email Address
                   </label>
                   <input
@@ -424,7 +388,7 @@ export const GlobalAuthPortal: React.FC<GlobalAuthPortalProps> = ({
                     value={adminEmail}
                     onChange={(e) => setAdminEmail(e.target.value)}
                     required
-                    placeholder="admin@ardhnarishwar.ai"
+                    placeholder="Enter your work email"
                     className="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 outline-none transition-colors"
                   />
                 </div>
@@ -438,61 +402,25 @@ export const GlobalAuthPortal: React.FC<GlobalAuthPortalProps> = ({
                     value={adminPassword}
                     onChange={(e) => setAdminPassword(e.target.value)}
                     required
-                    placeholder="••••••••••••"
+                    placeholder="Enter password"
                     className="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 outline-none transition-colors"
                   />
                 </div>
 
                 <button
                   type="submit"
-                  className="w-full py-3.5 rounded-xl font-extrabold text-sm bg-gradient-to-r from-cyan-500 via-indigo-600 to-purple-600 hover:from-cyan-400 hover:to-indigo-500 text-white shadow-xl shadow-cyan-500/25 transition-all flex items-center justify-center gap-2 active:scale-[0.99]"
+                  disabled={isLoading}
+                  className="w-full py-3.5 rounded-xl font-extrabold text-sm bg-gradient-to-r from-cyan-500 via-indigo-600 to-purple-600 hover:from-cyan-400 hover:to-indigo-500 text-white shadow-xl shadow-cyan-500/25 transition-all flex items-center justify-center gap-2 active:scale-[0.99] disabled:opacity-50"
                 >
-                  <ShieldCheck className="w-4 h-4" />
+                  {isLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <ShieldCheck className="w-4 h-4" />
+                  )}
                   <span>Sign In to Platform Workspace</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </form>
-
-              {/* 1-Click Fast Enterprise Role Switcher */}
-              <div className="pt-4 border-t border-slate-800/80 space-y-2">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 text-center">
-                  ⚡ 1-Click Fast Enterprise Logins
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleQuickPersona('SUPER_ADMIN', 'admin@ardhnarishwar.ai')}
-                    className="p-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-left transition-all"
-                  >
-                    <div className="text-[11px] font-bold text-cyan-300">👑 Super Admin</div>
-                    <div className="text-[9px] text-slate-400 truncate">Global HQ</div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickPersona('COMPANY_ADMIN', 'admin@cyberdyne.io')}
-                    className="p-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-left transition-all"
-                  >
-                    <div className="text-[11px] font-bold text-indigo-300">🏢 HR Director</div>
-                    <div className="text-[9px] text-slate-400 truncate">Cyberdyne</div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickPersona('RECRUITER', 'recruiter@cyberdyne.io')}
-                    className="p-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-left transition-all"
-                  >
-                    <div className="text-[11px] font-bold text-purple-300">🎯 Recruiter</div>
-                    <div className="text-[9px] text-slate-400 truncate">Talent Lead</div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickPersona('EMPLOYEE', 'alex.mercer@cyberdyne.io')}
-                    className="p-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-left transition-all"
-                  >
-                    <div className="text-[11px] font-bold text-teal-300">⚙️ Staff Engineer</div>
-                    <div className="text-[9px] text-slate-400 truncate">Alex Mercer</div>
-                  </button>
-                </div>
-              </div>
             </div>
           )}
 
@@ -507,7 +435,7 @@ export const GlobalAuthPortal: React.FC<GlobalAuthPortalProps> = ({
                     candidateSubTab === 'login' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  Candidate Login (I have ID/Token)
+                  Candidate Login (Token / ID)
                 </button>
                 <button
                   type="button"
@@ -537,16 +465,18 @@ export const GlobalAuthPortal: React.FC<GlobalAuthPortalProps> = ({
                       type="text"
                       value={candIdInput}
                       onChange={(e) => setCandIdInput(e.target.value)}
-                      placeholder="e.g. cand_priya_01 or TOKEN_PRIYA_ROBOTICS_2026"
-                      className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 outline-none"
+                      required
+                      placeholder="Enter Candidate ID, Token, or Email"
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 outline-none font-mono"
                     />
                   </div>
 
                   <button
                     type="submit"
-                    className="w-full py-3.5 rounded-xl font-extrabold text-sm bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white shadow-xl shadow-emerald-500/25 transition-all flex items-center justify-center gap-2"
+                    disabled={isLoading}
+                    className="w-full py-3.5 rounded-xl font-extrabold text-sm bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white shadow-xl shadow-emerald-500/25 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                   >
-                    <UserCheck className="w-4 h-4" />
+                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4" />}
                     <span>Access AI Interview Chamber</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
@@ -569,8 +499,8 @@ export const GlobalAuthPortal: React.FC<GlobalAuthPortalProps> = ({
                         value={regName}
                         onChange={(e) => setRegName(e.target.value)}
                         required
-                        placeholder="Priya Sharma"
-                        className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-3 py-2 text-xs text-white outline-none"
+                        placeholder="Enter full name"
+                        className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 outline-none"
                       />
                     </div>
                     <div>
@@ -580,44 +510,69 @@ export const GlobalAuthPortal: React.FC<GlobalAuthPortalProps> = ({
                         value={regEmail}
                         onChange={(e) => setRegEmail(e.target.value)}
                         required
-                        placeholder="priya.sharma@example.com"
-                        className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-3 py-2 text-xs text-white outline-none"
+                        placeholder="Enter email address"
+                        className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 outline-none"
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[11px] font-bold text-slate-400 uppercase mb-1">Target Opening</label>
-                      <select
-                        value={regJobId}
-                        onChange={(e) => setRegJobId(e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-3 py-2 text-xs text-white outline-none"
-                      >
-                        {jobs.map(j => (
-                          <option key={j.id} value={j.id}>{j.title}</option>
-                        ))}
-                      </select>
+                      <label className="block text-[11px] font-bold text-slate-400 uppercase mb-1">Phone Number (Optional)</label>
+                      <input
+                        type="tel"
+                        value={regPhone}
+                        onChange={(e) => setRegPhone(e.target.value)}
+                        placeholder="Enter phone number"
+                        className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 outline-none"
+                      />
                     </div>
                     <div>
                       <label className="block text-[11px] font-bold text-slate-400 uppercase mb-1">Years of Experience</label>
                       <input
                         type="number"
                         min="0"
-                        max="30"
-                        value={regExperience}
+                        max="40"
+                        value={regExperience || ''}
                         onChange={(e) => setRegExperience(Number(e.target.value))}
-                        className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-3 py-2 text-xs text-white outline-none"
+                        placeholder="Enter years of experience"
+                        className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 outline-none"
                       />
                     </div>
                   </div>
 
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-400 uppercase mb-1">Target Opening / Job Position</label>
+                    <select
+                      value={regJobId}
+                      onChange={(e) => setRegJobId(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-3 py-2 text-xs text-white outline-none"
+                    >
+                      <option value="">-- Select Target Position --</option>
+                      {jobs.map(j => (
+                        <option key={j.id} value={j.id}>{j.title}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-400 uppercase mb-1">Key Skills & Competencies</label>
+                    <input
+                      type="text"
+                      value={regSkills}
+                      onChange={(e) => setRegSkills(e.target.value)}
+                      placeholder="Enter key skills (e.g., Python, ROS2, C++, Machine Learning)"
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 outline-none"
+                    />
+                  </div>
+
                   <button
                     type="submit"
-                    className="w-full py-3 rounded-xl font-extrabold text-sm bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-xl shadow-emerald-500/25 transition-all flex items-center justify-center gap-2"
+                    disabled={isLoading}
+                    className="w-full py-3 rounded-xl font-extrabold text-sm bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white shadow-xl shadow-emerald-500/25 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                   >
-                    <span>Complete Registration & Generate Token</span>
-                    <ArrowRight className="w-4 h-4" />
+                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
+                    <span>Complete Registration & Generate Interview Token</span>
                   </button>
                 </form>
               )}
@@ -650,6 +605,11 @@ export const GlobalAuthPortal: React.FC<GlobalAuthPortalProps> = ({
                   {companySuccessMsg}
                 </div>
               )}
+              {companyError && (
+                <div className="p-3 rounded-xl bg-rose-950 border border-rose-800 text-rose-300 text-xs">
+                  {companyError}
+                </div>
+              )}
 
               <form onSubmit={handleRegisterCompany} className="space-y-3">
                 <div>
@@ -659,8 +619,8 @@ export const GlobalAuthPortal: React.FC<GlobalAuthPortalProps> = ({
                     value={companyName}
                     onChange={(e) => setCompanyName(e.target.value)}
                     required
-                    placeholder="e.g. Quantum Dynamics Corp"
-                    className="w-full bg-slate-950 border border-slate-800 focus:border-purple-500 rounded-xl px-3 py-2 text-xs text-white outline-none"
+                    placeholder="Enter company or organization name"
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-purple-500 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 outline-none"
                   />
                 </div>
 
@@ -671,28 +631,52 @@ export const GlobalAuthPortal: React.FC<GlobalAuthPortalProps> = ({
                       type="text"
                       value={companyDomain}
                       onChange={(e) => setCompanyDomain(e.target.value)}
-                      placeholder="quantumdynamics.com"
-                      className="w-full bg-slate-950 border border-slate-800 focus:border-purple-500 rounded-xl px-3 py-2 text-xs text-white outline-none"
+                      placeholder="Enter corporate domain (e.g., acme.com)"
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-purple-500 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-400 uppercase mb-1">Contact Email</label>
+                    <label className="block text-[11px] font-bold text-slate-400 uppercase mb-1">Official Contact Email</label>
                     <input
                       type="email"
                       value={companyContactEmail}
                       onChange={(e) => setCompanyContactEmail(e.target.value)}
                       required
-                      placeholder="admin@quantumdynamics.com"
-                      className="w-full bg-slate-950 border border-slate-800 focus:border-purple-500 rounded-xl px-3 py-2 text-xs text-white outline-none"
+                      placeholder="Enter contact email (e.g., admin@acme.com)"
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-purple-500 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-400 uppercase mb-1">Primary Contact Person</label>
+                    <input
+                      type="text"
+                      value={companyContactPerson}
+                      onChange={(e) => setCompanyContactPerson(e.target.value)}
+                      placeholder="Enter primary contact person"
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-purple-500 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-400 uppercase mb-1">Industry Sector</label>
+                    <input
+                      type="text"
+                      value={companyIndustry}
+                      onChange={(e) => setCompanyIndustry(e.target.value)}
+                      placeholder="Enter industry (e.g., Robotics, AI, Healthcare)"
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-purple-500 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 outline-none"
                     />
                   </div>
                 </div>
 
                 <button
                   type="submit"
-                  className="w-full py-3 rounded-xl font-extrabold text-sm bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-xl shadow-purple-500/25 transition-all flex items-center justify-center gap-2"
+                  disabled={isLoading}
+                  className="w-full py-3 rounded-xl font-extrabold text-sm bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-xl shadow-purple-500/25 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                 >
-                  <Building2 className="w-4 h-4" />
+                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Building2 className="w-4 h-4" />}
                   <span>Provision New Company Workspace</span>
                 </button>
               </form>
@@ -707,6 +691,11 @@ export const GlobalAuthPortal: React.FC<GlobalAuthPortalProps> = ({
                   {empSuccessMsg}
                 </div>
               )}
+              {empError && (
+                <div className="p-3 rounded-xl bg-rose-950 border border-rose-800 text-rose-300 text-xs">
+                  {empError}
+                </div>
+              )}
 
               <form onSubmit={handleRegisterEmployee} className="space-y-3">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -717,41 +706,56 @@ export const GlobalAuthPortal: React.FC<GlobalAuthPortalProps> = ({
                       value={empName}
                       onChange={(e) => setEmpName(e.target.value)}
                       required
-                      placeholder="e.g. Alex Mercer"
-                      className="w-full bg-slate-950 border border-slate-800 focus:border-teal-500 rounded-xl px-3 py-2 text-xs text-white outline-none"
+                      placeholder="Enter full name"
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-teal-500 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-400 uppercase mb-1">Employee Email</label>
+                    <label className="block text-[11px] font-bold text-slate-400 uppercase mb-1">Work Email Address</label>
                     <input
                       type="email"
                       value={empEmail}
                       onChange={(e) => setEmpEmail(e.target.value)}
                       required
-                      placeholder="alex.mercer@cyberdyne.io"
-                      className="w-full bg-slate-950 border border-slate-800 focus:border-teal-500 rounded-xl px-3 py-2 text-xs text-white outline-none"
+                      placeholder="Enter work email"
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-teal-500 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 outline-none"
                     />
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-400 uppercase mb-1">Select Employer Tenant</label>
-                  <select
-                    value={empCompanyId}
-                    onChange={(e) => setEmpCompanyId(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 focus:border-teal-500 rounded-xl px-3 py-2 text-xs text-white outline-none"
-                  >
-                    {allCompanies.map(c => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-400 uppercase mb-1">Select Employer Tenant</label>
+                    <select
+                      value={empCompanyId}
+                      onChange={(e) => setEmpCompanyId(e.target.value)}
+                      required
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-teal-500 rounded-xl px-3 py-2 text-xs text-white outline-none"
+                    >
+                      <option value="">-- Select Employer Organization --</option>
+                      {allCompanies.map(c => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-400 uppercase mb-1">Job Title / Designation</label>
+                    <input
+                      type="text"
+                      value={empDesignation}
+                      onChange={(e) => setEmpDesignation(e.target.value)}
+                      placeholder="Enter job designation"
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-teal-500 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 outline-none"
+                    />
+                  </div>
                 </div>
 
                 <button
                   type="submit"
-                  className="w-full py-3 rounded-xl font-extrabold text-sm bg-gradient-to-r from-teal-500 to-cyan-600 text-white shadow-xl shadow-teal-500/25 transition-all flex items-center justify-center gap-2"
+                  disabled={isLoading}
+                  className="w-full py-3 rounded-xl font-extrabold text-sm bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-400 hover:to-cyan-500 text-white shadow-xl shadow-teal-500/25 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                 >
-                  <Users className="w-4 h-4" />
+                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />}
                   <span>Register Staff Member Profile</span>
                 </button>
               </form>
@@ -765,9 +769,9 @@ export const GlobalAuthPortal: React.FC<GlobalAuthPortalProps> = ({
       <footer className="relative z-10 px-6 py-4 border-t border-slate-800/60 bg-slate-950/40 backdrop-blur-md flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500 font-mono">
         <div>Ardhnarishwar AI Robotics SaaS © 2026 • Real-Time Autonomous Assessment</div>
         <div className="flex items-center gap-3">
-          <span>WebSocket Bus: <strong>ACTIVE</strong></span>
+          <span>Zero-Trust Auth: <strong>ACTIVE</strong></span>
           <span>•</span>
-          <span>Zero External APIs</span>
+          <span>WebSocket Live Bus: <strong>CONNECTED</strong></span>
         </div>
       </footer>
 
