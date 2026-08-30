@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  # 1. MySQL 8.0 Relational Database Service
+  mysql_db:
+    image: mysql:8.0
+    container_name: ardhnarishwar_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-RootSecured2026!}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-ardhnarishwar_saas}
+      MYSQL_USER: ${MYSQL_USER:-ardhnarishwar_admin}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-SecureDBPass2026!}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-RootSecured2026!}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - ardhnarishwar_net
+
+  # 2. FastAPI Backend & In-House AI Evaluation Engine
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ardhnarishwar_backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - MYSQL_HOST=mysql_db
+      - MYSQL_PORT=3306
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-ardhnarishwar_saas}
+      - MYSQL_USER=${MYSQL_USER:-ardhnarishwar_admin}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-SecureDBPass2026!}
+      - SECRET_KEY=${SECRET_KEY:-ardhnarishwar_jwt_production_secret_key_minimum_32_chars_long_2026}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - RECORDING_STORAGE_ROOT=/storage/recordings
+    ports:
+      - "8000:8000"
+    volumes:
+      - recording_storage:/storage/recordings
+    depends_on:
+      mysql_db:
+        condition: service_healthy
+    networks:
+      - ardhnarishwar_net
+
+  # 3. React Frontend SaaS Dashboard (Nginx)
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ardhnarishwar_frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - ardhnarishwar_net
+
+volumes:
+  mysql_data:
+  recording_storage:
+
+networks:
+  ardhnarishwar_net:
+    driver: bridge

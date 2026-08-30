@@ -1,0 +1,312 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* Default Cyber Dark Tokens */
+  :root,
+  .theme-cyber-dark,
+  [data-theme="cyber-dark"] {
+    --bg-primary: #070913;
+    --bg-surface: #0f1422;
+    --bg-card: rgba(15, 23, 42, 0.75);
+    --border-color: rgba(30, 41, 59, 0.8);
+    --text-primary: #f8fafc;
+    --text-muted: #94a3b8;
+    --accent-glow: rgba(6, 182, 212, 0.4);
+  }
+
+  /* Matrix Emerald Theme */
+  .theme-matrix-emerald,
+  [data-theme="matrix-emerald"] {
+    --bg-primary: #03080a;
+    --bg-surface: #061215;
+    --bg-card: rgba(6, 18, 22, 0.85);
+    --border-color: rgba(16, 185, 129, 0.28);
+    --text-primary: #ecfdf5;
+    --text-muted: #6ee7b7;
+    --accent-glow: rgba(16, 185, 129, 0.4);
+  }
+
+  /* Sunset Nebula Theme */
+  .theme-sunset-nebula,
+  [data-theme="sunset-nebula"] {
+    --bg-primary: #0c0516;
+    --bg-surface: #150924;
+    --bg-card: rgba(26, 11, 44, 0.85);
+    --border-color: rgba(244, 63, 94, 0.28);
+    --text-primary: #fff1f2;
+    --text-muted: #f472b6;
+    --accent-glow: rgba(244, 63, 94, 0.4);
+  }
+
+  /* Enterprise Light Theme */
+  .theme-enterprise-light,
+  [data-theme="enterprise-light"] {
+    --bg-primary: #f8fafc;
+    --bg-surface: #ffffff;
+    --bg-card: rgba(255, 255, 255, 0.95);
+    --border-color: rgba(203, 213, 225, 0.9);
+    --text-primary: #0f172a;
+    --text-muted: #475569;
+    --accent-glow: rgba(37, 99, 235, 0.2);
+  }
+
+  body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    @apply font-sans antialiased selection:bg-cyan-500 selection:text-white transition-colors duration-300;
+  }
+
+  /* Custom Glassmorphism Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: rgba(13, 19, 34, 0.5);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #1e293b;
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #06b6d4;
+  }
+}
+
+/* ==========================================================================
+   THEME OVERRIDES: MATRIX EMERALD
+   ========================================================================== */
+.theme-matrix-emerald,
+[data-theme="matrix-emerald"] {
+  background-color: #03080a !important;
+  color: #ecfdf5 !important;
+}
+
+.theme-matrix-emerald body,
+[data-theme="matrix-emerald"] body,
+.theme-matrix-emerald .min-h-screen,
+[data-theme="matrix-emerald"] .min-h-screen {
+  background-color: #03080a !important;
+  color: #ecfdf5;
+}
+
+.theme-matrix-emerald .bg-\[\#070913\],
+[data-theme="matrix-emerald"] .bg-\[\#070913\] {
+  background-color: #03080a !important;
+}
+
+.theme-matrix-emerald .bg-slate-950,
+[data-theme="matrix-emerald"] .bg-slate-950,
+.theme-matrix-emerald .bg-slate-950\/80,
+[data-theme="matrix-emerald"] .bg-slate-950\/80,
+.theme-matrix-emerald .bg-slate-950\/90,
+[data-theme="matrix-emerald"] .bg-slate-950\/90 {
+  background-color: #061215 !important;
+}
+
+.theme-matrix-emerald .bg-slate-900,
+[data-theme="matrix-emerald"] .bg-slate-900,
+.theme-matrix-emerald .bg-slate-900\/90,
+[data-theme="matrix-emerald"] .bg-slate-900\/90,
+.theme-matrix-emerald .bg-slate-900\/70,
+[data-theme="matrix-emerald"] .bg-slate-900\/70 {
+  background-color: #08171b !important;
+}
+
+.theme-matrix-emerald .bg-slate-800,
+[data-theme="matrix-emerald"] .bg-slate-800 {
+  background-color: #0f242b !important;
+}
+
+.theme-matrix-emerald .border-slate-800,
+[data-theme="matrix-emerald"] .border-slate-800,
+.theme-matrix-emerald .border-slate-700,
+[data-theme="matrix-emerald"] .border-slate-700 {
+  border-color: rgba(16, 185, 129, 0.25) !important;
+}
+
+/* ==========================================================================
+   THEME OVERRIDES: SUNSET NEBULA
+   ========================================================================== */
+.theme-sunset-nebula,
+[data-theme="sunset-nebula"] {
+  background-color: #0c0516 !important;
+  color: #fff1f2 !important;
+}
+
+.theme-sunset-nebula body,
+[data-theme="sunset-nebula"] body,
+.theme-sunset-nebula .min-h-screen,
+[data-theme="sunset-nebula"] .min-h-screen {
+  background-color: #0c0516 !important;
+  color: #fff1f2;
+}
+
+.theme-sunset-nebula .bg-\[\#070913\],
+[data-theme="sunset-nebula"] .bg-\[\#070913\] {
+  background-color: #0c0516 !important;
+}
+
+.theme-sunset-nebula .bg-slate-950,
+[data-theme="sunset-nebula"] .bg-slate-950,
+.theme-sunset-nebula .bg-slate-950\/80,
+[data-theme="sunset-nebula"] .bg-slate-950\/80,
+.theme-sunset-nebula .bg-slate-950\/90,
+[data-theme="sunset-nebula"] .bg-slate-950\/90 {
+  background-color: #150924 !important;
+}
+
+.theme-sunset-nebula .bg-slate-900,
+[data-theme="sunset-nebula"] .bg-slate-900,
+.theme-sunset-nebula .bg-slate-900\/90,
+[data-theme="sunset-nebula"] .bg-slate-900\/90,
+.theme-sunset-nebula .bg-slate-900\/70,
+[data-theme="sunset-nebula"] .bg-slate-900\/70 {
+  background-color: #1c0c32 !important;
+}
+
+.theme-sunset-nebula .bg-slate-800,
+[data-theme="sunset-nebula"] .bg-slate-800 {
+  background-color: #2b124a !important;
+}
+
+.theme-sunset-nebula .border-slate-800,
+[data-theme="sunset-nebula"] .border-slate-800,
+.theme-sunset-nebula .border-slate-700,
+[data-theme="sunset-nebula"] .border-slate-700 {
+  border-color: rgba(244, 63, 94, 0.25) !important;
+}
+
+/* ==========================================================================
+   THEME OVERRIDES: ENTERPRISE LIGHT
+   ========================================================================== */
+.theme-enterprise-light,
+[data-theme="enterprise-light"] {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+.theme-enterprise-light body,
+[data-theme="enterprise-light"] body,
+.theme-enterprise-light .min-h-screen,
+[data-theme="enterprise-light"] .min-h-screen {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+.theme-enterprise-light .bg-\[\#070913\],
+[data-theme="enterprise-light"] .bg-\[\#070913\] {
+  background-color: #f8fafc !important;
+}
+
+.theme-enterprise-light .bg-slate-950,
+[data-theme="enterprise-light"] .bg-slate-950,
+.theme-enterprise-light .bg-slate-950\/80,
+[data-theme="enterprise-light"] .bg-slate-950\/80,
+.theme-enterprise-light .bg-slate-950\/90,
+[data-theme="enterprise-light"] .bg-slate-950\/90 {
+  background-color: #f1f5f9 !important;
+}
+
+.theme-enterprise-light .bg-slate-900,
+[data-theme="enterprise-light"] .bg-slate-900,
+.theme-enterprise-light .bg-slate-900\/90,
+[data-theme="enterprise-light"] .bg-slate-900\/90,
+.theme-enterprise-light .bg-slate-900\/70,
+[data-theme="enterprise-light"] .bg-slate-900\/70 {
+  background-color: #ffffff !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.08), 0 1px 2px -1px rgba(0, 0, 0, 0.08);
+}
+
+.theme-enterprise-light .bg-slate-800,
+[data-theme="enterprise-light"] .bg-slate-800 {
+  background-color: #e2e8f0 !important;
+}
+
+.theme-enterprise-light .border-slate-800,
+[data-theme="enterprise-light"] .border-slate-800,
+.theme-enterprise-light .border-slate-700,
+[data-theme="enterprise-light"] .border-slate-700 {
+  border-color: #cbd5e1 !important;
+}
+
+.theme-enterprise-light .text-white,
+[data-theme="enterprise-light"] .text-white,
+.theme-enterprise-light .text-slate-100,
+[data-theme="enterprise-light"] .text-slate-100,
+.theme-enterprise-light .text-slate-200,
+[data-theme="enterprise-light"] .text-slate-200 {
+  color: #0f172a !important;
+}
+
+.theme-enterprise-light .text-slate-300,
+[data-theme="enterprise-light"] .text-slate-300,
+.theme-enterprise-light .text-slate-400,
+[data-theme="enterprise-light"] .text-slate-400 {
+  color: #334155 !important;
+}
+
+.theme-enterprise-light .text-slate-500,
+[data-theme="enterprise-light"] .text-slate-500 {
+  color: #64748b !important;
+}
+
+.theme-enterprise-light input,
+[data-theme="enterprise-light"] input,
+.theme-enterprise-light select,
+[data-theme="enterprise-light"] select,
+.theme-enterprise-light textarea,
+[data-theme="enterprise-light"] textarea {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+/* Glassmorphism Card Utility */
+.glass-panel {
+  background: var(--bg-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-color);
+}
+
+.glow-card-cyan {
+  box-shadow: 0 0 25px -5px rgba(6, 182, 212, 0.2);
+}
+
+.glow-card-emerald {
+  box-shadow: 0 0 25px -5px rgba(16, 185, 129, 0.2);
+}
+
+.glow-card-rose {
+  box-shadow: 0 0 25px -5px rgba(244, 63, 94, 0.2);
+}
+
+/* Print Stylesheet for High-Fidelity PDF Dossier Export */
+@media print {
+  header, aside, button, select, input, .no-print {
+    display: none !important;
+  }
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+}
+
+.mirror-mode {
+  transform: scaleX(-1);
+}
+
+@keyframes audioWave {
+  0%, 100% { height: 4px; }
+  50% { height: 24px; }
+}
+
+.animate-audio-wave {
+  animation: audioWave 1.2s ease-in-out infinite;
+}

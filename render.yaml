@@ -1,0 +1,62 @@
+# Render Blueprint Configuration (render.yaml)
+# Deploys both FastAPI Python Backend and Vite React Frontend for free 24/7
+version: "1"
+
+services:
+  # 1. FastAPI Python Realtime Backend API
+  - type: web
+    name: ardhnarishwar-backend-api
+    env: python
+    region: oregon
+    plan: free
+    branch: main
+    rootDir: backend
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: ENVIRONMENT
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALLOWED_ORIGINS
+        value: "https://*.vercel.app,https://*.netlify.app,https://*.onrender.com"
+      - key: DB_ECHO_SQL
+        value: "false"
+
+  # 2. React Vite Frontend Static Site
+  - type: web
+    name: ardhnarishwar-frontend-app
+    env: static
+    region: oregon
+    plan: free
+    branch: main
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    autoDeploy: true
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: Permissions-Policy
+        value: camera=*, microphone=*, display-capture=*
+    envVars:
+      - key: NODE_VERSION
+        value: "20.12.0"
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: ardhnarishwar-backend-api
+          property: host
+      - key: VITE_WS_URL
+        fromService:
+          type: web
+          name: ardhnarishwar-backend-api
+          property: host
