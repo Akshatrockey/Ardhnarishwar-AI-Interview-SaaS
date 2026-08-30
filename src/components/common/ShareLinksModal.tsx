@@ -38,6 +38,16 @@ export const ShareLinksModal: React.FC<ShareLinksModalProps> = ({ isOpen, onClos
 
   const shareableLinks = [
     {
+      id: 'universal_root',
+      title: '⭐ Universal Single Link (For Everyone)',
+      description: 'The ONE link for all users: opens full platform with 1-click access to candidate chamber, landing page, and all dashboards.',
+      badge: 'Master Universal Link',
+      badgeColor: 'bg-gradient-to-r from-cyan-500 to-indigo-600 text-white font-black',
+      icon: Globe,
+      iconColor: 'text-cyan-400',
+      url: `${baseUrl}/`
+    },
+    {
       id: 'candidate_interview',
       title: 'Candidate Live AI Interview Chamber',
       description: '1-Click candidate access: directly launches the AI interview & hardware diagnostic.',
