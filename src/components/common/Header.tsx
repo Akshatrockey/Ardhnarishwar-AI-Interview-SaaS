@@ -26,12 +26,16 @@ import {
   User as UserIcon, 
   Palette, 
   Video,
-  Share2
+  Share2,
+  Bell,
+  CheckCircle2,
+  Home
 } from 'lucide-react';
 
 interface HeaderProps {
   onOpenCandidateDemo?: () => void;
   onOpenCandidatePortal?: () => void;
+  onOpenLandingPage?: () => void;
   onNavigateTab: (tab: string) => void;
   onLogout?: () => void;
   onLaunchMeeting?: (roomId: string, candidateName?: string, jobTitle?: string) => void;
@@ -40,6 +44,7 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({ 
   onOpenCandidateDemo, 
   onOpenCandidatePortal,
+  onOpenLandingPage,
   onNavigateTab,
   onLogout,
   onLaunchMeeting,
@@ -69,9 +74,16 @@ export const Header: React.FC<HeaderProps> = ({
   const [showCompanyMenu, setShowCompanyMenu] = useState(false);
   const [showPersonaMenu, setShowPersonaMenu] = useState(false);
   const [showThemeMenu, setShowThemeMenu] = useState(false);
+  const [showNotificationMenu, setShowNotificationMenu] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
+
+  const notifications = [
+    { id: 'n1', title: 'AI Scorecard Dossier Ready', desc: 'Candidate Priya Sharma completed Robotics Perception interview (Score: 92%).', time: '2m ago', unread: true },
+    { id: 'n2', title: 'New Application Received', desc: 'Candidate self-registered for Lead Perception opening.', time: '18m ago', unread: true },
+    { id: 'n3', title: 'Proctoring Telemetry Normal', desc: 'Zero unauthorized tab switches or face occlusions detected.', time: '1h ago', unread: false },
+  ];
 
   const users = AppDataStore.getUsers();
   const personas: { id: string; label: string; role: string }[] = users.map((u: User) => ({
@@ -233,6 +245,60 @@ export const Header: React.FC<HeaderProps> = ({
               )}
             </div>
           )}
+
+          {/* Public Landing Page Switcher */}
+          {onOpenLandingPage && (
+            <button
+              onClick={onOpenLandingPage}
+              className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-300 bg-slate-850 hover:bg-slate-800 border border-slate-700 hover:text-white transition-all shadow-sm"
+              title="Visit Product Landing Page"
+            >
+              <Home className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Landing Page</span>
+            </button>
+          )}
+
+          {/* Real-Time Notification Center */}
+          <div className="relative">
+            <button
+              onClick={() => setShowNotificationMenu(!showNotificationMenu)}
+              className="p-2 rounded-xl bg-slate-850 hover:bg-slate-800 text-slate-300 border border-slate-700 transition-colors relative"
+              title="Notifications"
+            >
+              <Bell className="w-4 h-4 text-cyan-400" />
+              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-cyan-400" />
+            </button>
+
+            {showNotificationMenu && (
+              <div className="absolute right-0 mt-2 w-80 rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl p-3 z-50 animate-in fade-in space-y-2">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                  <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <Bell className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Real-Time Notifications</span>
+                  </div>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-950 text-cyan-300 border border-cyan-800">
+                    3 New
+                  </span>
+                </div>
+
+                <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                  {notifications.map((n) => (
+                    <div
+                      key={n.id}
+                      className="p-2.5 rounded-xl bg-slate-950/80 hover:bg-slate-800/80 border border-slate-800/80 transition-colors space-y-1"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-slate-200">{n.title}</span>
+                        <span className="text-[9px] font-mono text-slate-500">{n.time}</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 leading-tight">{n.desc}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Multi-Theme Selector Dropdown */}
           <div className="relative">

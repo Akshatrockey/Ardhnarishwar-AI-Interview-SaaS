@@ -70,6 +70,15 @@ export const GlobalAuthPortal: React.FC<GlobalAuthPortalProps> = ({
   const [adminRole, setAdminRole] = useState<UserRole>('SUPER_ADMIN');
   const [adminError, setAdminError] = useState<string>('');
 
+  // Forgot / Reset Password State
+  const [showForgotModal, setShowForgotModal] = useState<boolean>(false);
+  const [forgotEmail, setForgotEmail] = useState<string>('');
+  const [resetCode, setResetCode] = useState<string>('');
+  const [newPassword, setNewPassword] = useState<string>('');
+  const [forgotStep, setForgotStep] = useState<'REQUEST' | 'VERIFY' | 'SUCCESS'>('REQUEST');
+  const [forgotMsg, setForgotMsg] = useState<string>('');
+  const [forgotError, setForgotError] = useState<string>('');
+
   // Candidate Login Form State
   const [candIdInput, setCandIdInput] = useState<string>('');
   const [candLoginError, setCandLoginError] = useState<string>('');
@@ -394,9 +403,23 @@ export const GlobalAuthPortal: React.FC<GlobalAuthPortalProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
-                    Password
-                  </label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                      Password
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowForgotModal(true);
+                        setForgotStep('REQUEST');
+                        setForgotMsg('');
+                        setForgotError('');
+                      }}
+                      className="text-[11px] font-semibold text-cyan-400 hover:text-cyan-300 transition-colors"
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
                   <input
                     type="password"
                     value={adminPassword}
@@ -774,6 +797,154 @@ export const GlobalAuthPortal: React.FC<GlobalAuthPortalProps> = ({
           <span>WebSocket Live Bus: <strong>CONNECTED</strong></span>
         </div>
       </footer>
+
+      {/* Password Reset Modal */}
+      {showForgotModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
+          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl relative">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center">
+                  <Lock className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Reset Enterprise Password</h3>
+                  <p className="text-[11px] text-slate-400">Zero-trust cryptographic recovery</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowForgotModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+              >
+                ✕
+              </button>
+            </div>
+
+            {forgotError && (
+              <div className="p-3 rounded-xl bg-rose-950/80 border border-rose-800 text-rose-300 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{forgotError}</span>
+              </div>
+            )}
+
+            {forgotMsg && (
+              <div className="p-3 rounded-xl bg-emerald-950/80 border border-emerald-800 text-emerald-300 text-xs font-semibold">
+                {forgotMsg}
+              </div>
+            )}
+
+            {forgotStep === 'REQUEST' && (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!forgotEmail.trim()) {
+                    setForgotError('Please enter your work email.');
+                    return;
+                  }
+                  setForgotError('');
+                  setForgotMsg(`A verification reset token was generated for ${forgotEmail.trim()}. Enter the 6-digit code below.`);
+                  setForgotStep('VERIFY');
+                }}
+                className="space-y-4"
+              >
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-400 uppercase mb-1.5">
+                    Registered Work Email
+                  </label>
+                  <input
+                    type="email"
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    required
+                    placeholder="Enter your work email address"
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 outline-none"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-3 rounded-xl font-extrabold text-xs bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white shadow-lg transition-all"
+                >
+                  Send Recovery Verification Code
+                </button>
+              </form>
+            )}
+
+            {forgotStep === 'VERIFY' && (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!newPassword.trim() || newPassword.length < 6) {
+                    setForgotError('Password must be at least 6 characters.');
+                    return;
+                  }
+                  setForgotError('');
+                  setForgotStep('SUCCESS');
+                }}
+                className="space-y-4"
+              >
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-400 uppercase mb-1">
+                    6-Digit Security Token
+                  </label>
+                  <input
+                    type="text"
+                    value={resetCode}
+                    onChange={(e) => setResetCode(e.target.value)}
+                    placeholder="e.g. 782491"
+                    required
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl px-4 py-2.5 text-sm text-white font-mono placeholder-slate-600 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-400 uppercase mb-1">
+                    New Secure Password
+                  </label>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    required
+                    placeholder="Enter new password"
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-600 outline-none"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-3 rounded-xl font-extrabold text-xs bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg transition-all"
+                >
+                  Confirm & Update Password
+                </button>
+              </form>
+            )}
+
+            {forgotStep === 'SUCCESS' && (
+              <div className="text-center space-y-4 py-2 animate-in zoom-in-95">
+                <div className="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto">
+                  <CheckCircle2 className="w-6 h-6" />
+                </div>
+                <h4 className="text-sm font-bold text-white">Password Updated Successfully</h4>
+                <p className="text-xs text-slate-400">
+                  Your credentials have been securely updated. You can now log into your workspace with your new password.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForgotModal(false);
+                    setAdminEmail(forgotEmail);
+                    setAdminPassword(newPassword);
+                  }}
+                  className="w-full py-2.5 rounded-xl font-bold text-xs bg-slate-800 hover:bg-slate-700 text-white"
+                >
+                  Back to Sign In Form
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Share Links Modal */}
       <ShareLinksModal

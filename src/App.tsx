@@ -34,9 +34,10 @@ import { EmployeePortal } from './views/EmployeePortal';
 import { AIChatbox } from './components/chatbox/AIChatbox';
 import { LiveVideoConferenceRoom } from './components/conference/LiveVideoConferenceRoom';
 
-// Standalone Candidate Portal & Global Auth Portal
+// Standalone Candidate Portal & Global Auth Portal & Landing Page
 import { CandidatePortal } from './views/CandidatePortal';
 import { GlobalAuthPortal } from './views/GlobalAuthPortal';
+import { LandingPage } from './views/LandingPage';
 import { Candidate, JobPosition } from './types';
 import { AppDataStore } from './services/storage';
 
@@ -51,6 +52,8 @@ const AppContent: React.FC = () => {
   const [showCandidatePortal, setShowCandidatePortal] = useState<boolean>(false);
   const [candidateTokenForChamber, setCandidateTokenForChamber] = useState<string>('');
   const [showAuthPortal, setShowAuthPortal] = useState<boolean>(false);
+  const [showLandingPage, setShowLandingPage] = useState<boolean>(false);
+  const [authInitialTab, setAuthInitialTab] = useState<'admin' | 'candidate' | 'company_register' | 'employee_register'>('admin');
 
   // Modal & Video Conference State
   const [schedulingCandidate, setSchedulingCandidate] = useState<Candidate | null>(null);
@@ -72,9 +75,19 @@ const AppContent: React.FC = () => {
       const tabParam = params.get('tab');
       const candidateIdParam = params.get('candidateId') || params.get('cand');
 
+      // 0. Landing Page Direct Link (?page=landing)
+      const pageParam = params.get('page');
+      if (pageParam === 'landing') {
+        setShowLandingPage(true);
+        setShowAuthPortal(false);
+        setShowCandidatePortal(false);
+        return;
+      }
+
       // 1. Direct Token Candidate AI Chamber Link (?token=...)
       if (token) {
         setCandidateTokenForChamber(token);
+        setShowLandingPage(false);
         setShowAuthPortal(false);
         setShowCandidatePortal(true);
         return;
@@ -176,6 +189,30 @@ const AppContent: React.FC = () => {
     setActiveTab('live_conference');
   };
 
+  // If user is on the Modern Commercial SaaS Landing Page
+  if (showLandingPage) {
+    return (
+      <LandingPage
+        onNavigateAuth={(tab) => {
+          setAuthInitialTab(tab || 'admin');
+          setShowLandingPage(false);
+          setShowCandidatePortal(false);
+          setShowAuthPortal(true);
+        }}
+        onLaunchCandidateChamber={() => {
+          setShowLandingPage(false);
+          setShowAuthPortal(false);
+          setShowCandidatePortal(true);
+        }}
+        onOpenDemoChamber={() => {
+          setShowLandingPage(false);
+          setShowAuthPortal(false);
+          setShowCandidatePortal(true);
+        }}
+      />
+    );
+  }
+
   // If user opens Candidate Chamber Portal
   if (showCandidatePortal) {
     return (
@@ -200,6 +237,7 @@ const AppContent: React.FC = () => {
     return (
       <div className="min-h-screen bg-[#070913]">
         <GlobalAuthPortal
+          initialTab={authInitialTab}
           onCandidateLaunchChamber={(token) => {
             setCandidateTokenForChamber(token);
             setShowAuthPortal(false);
@@ -442,6 +480,8 @@ const AppContent: React.FC = () => {
 
       <Header
         onOpenCandidateDemo={() => setShowCandidatePortal(true)}
+        onOpenCandidatePortal={() => setShowCandidatePortal(true)}
+        onOpenLandingPage={() => setShowLandingPage(true)}
         onNavigateTab={setActiveTab}
         onLogout={() => setShowAuthPortal(true)}
         onLaunchMeeting={handleLaunchMeetingDirect}
