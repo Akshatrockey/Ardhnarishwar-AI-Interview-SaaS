@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "sync": "git add . && git commit -m \"Auto-sync project changes & settings\" && git push origin main",
+    "deploy": "npm run build && git add . && git commit -m \"Production live update\" && git push origin main"
   },
   "dependencies": {
     "clsx": "^2.1.1",
