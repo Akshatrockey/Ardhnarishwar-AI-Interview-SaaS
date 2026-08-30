@@ -41,7 +41,7 @@ import { Candidate, JobPosition } from './types';
 import { AppDataStore } from './services/storage';
 
 const AppContent: React.FC = () => {
-  const { currentUser, role, logout } = useAuth();
+  const { currentUser, role, logout, switchPersona } = useAuth();
   const { theme } = useTheme();
   const { t } = useLanguage();
   const { activeBroadcasts, dismissBroadcast } = useRealtime();
@@ -59,6 +59,99 @@ const AppContent: React.FC = () => {
     jobTitle: string;
     roomId: string;
   } | null>(null);
+
+  // Global URL Deep-Linking & 1-Click Auto-Login Handler
+  React.useEffect(() => {
+    const handleUrlRouting = () => {
+      const params = new URLSearchParams(window.location.search);
+      
+      const token = params.get('token') || params.get('interview');
+      const roleParam = params.get('role') || params.get('persona') || params.get('user');
+      const portalParam = params.get('portal');
+      const roomParam = params.get('room') || params.get('meeting');
+      const tabParam = params.get('tab');
+      const candidateIdParam = params.get('candidateId') || params.get('cand');
+
+      // 1. Direct Token Candidate AI Chamber Link (?token=...)
+      if (token) {
+        setCandidateTokenForChamber(token);
+        setShowAuthPortal(false);
+        setShowCandidatePortal(true);
+        return;
+      }
+
+      // 2. Direct Video Conference Room Access (?room=...)
+      if (roomParam) {
+        setShowAuthPortal(false);
+        setShowCandidatePortal(false);
+        setConferenceCandidate({
+          candidateName: params.get('name') || 'Candidate Interviewee',
+          jobTitle: params.get('title') || 'Robotics Assessment',
+          roomId: roomParam,
+        });
+        setActiveTab('live_conference');
+        return;
+      }
+
+      // 3. Direct Role / Auto-Login Access (?role=super_admin / ?role=recruiter / ?role=employee / ?role=company_admin)
+      if (roleParam) {
+        const roleNorm = roleParam.toLowerCase().trim();
+        const users = AppDataStore.getUsers();
+        let targetUser = null;
+        if (roleNorm === 'super_admin' || roleNorm === 'admin' || roleNorm === 'hq') {
+          targetUser = users.find(u => u.role === 'SUPER_ADMIN') || users[0];
+        } else if (roleNorm === 'company_admin' || roleNorm === 'hr' || roleNorm === 'director') {
+          targetUser = users.find(u => u.role === 'COMPANY_ADMIN');
+        } else if (roleNorm === 'recruiter' || roleNorm === 'talent') {
+          targetUser = users.find(u => u.role === 'RECRUITER');
+        } else if (roleNorm === 'employee' || roleNorm === 'staff') {
+          targetUser = users.find(u => u.role === 'EMPLOYEE');
+        }
+        if (targetUser) {
+          switchPersona(targetUser.id);
+          setShowAuthPortal(false);
+          setShowCandidatePortal(false);
+          if (roleNorm === 'recruiter') {
+            setActiveTab(tabParam || 'candidates');
+          } else if (roleNorm === 'employee') {
+            setActiveTab(tabParam || 'employee_desk');
+          } else {
+            setActiveTab(tabParam || 'dashboard');
+          }
+          return;
+        }
+      }
+
+      // 4. Portal Direct Access (?portal=candidate / ?portal=auth / ?portal=company_register)
+      if (portalParam) {
+        if (portalParam === 'candidate_chamber') {
+          setShowCandidatePortal(true);
+          setShowAuthPortal(false);
+        } else {
+          setShowCandidatePortal(false);
+          setShowAuthPortal(true);
+        }
+        return;
+      }
+
+      // 5. Candidate Scorecard Direct Link (?candidateId=cand_priya_01)
+      if (candidateIdParam) {
+        setSelectedCandidateId(candidateIdParam);
+        setShowAuthPortal(false);
+        setShowCandidatePortal(false);
+        return;
+      }
+
+      // 6. Direct Tab Navigation (?tab=schedule / ?tab=results)
+      if (tabParam) {
+        setActiveTab(tabParam);
+      }
+    };
+
+    handleUrlRouting();
+    window.addEventListener('popstate', handleUrlRouting);
+    return () => window.removeEventListener('popstate', handleUrlRouting);
+  }, []);
 
   const handleLaunchConferenceForCandidate = (cand: Candidate) => {
     const name = `${cand.firstName} ${cand.lastName}`;

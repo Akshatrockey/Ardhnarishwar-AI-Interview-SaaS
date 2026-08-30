@@ -52,14 +52,14 @@ export const CandidatePortal: React.FC<CandidatePortalProps> = ({
   const [completedSessionId, setCompletedSessionId] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string>('');
 
-  const handleVerifyToken = () => {
+  const verifyAndLaunchToken = (tokenToVerify: string) => {
     setErrorMessage('');
     const allCand = AppDataStore.getCandidates();
-    const found = allCand.find(c => c.interviewToken.toUpperCase() === tokenInput.trim().toUpperCase());
+    const found = allCand.find(c => c.interviewToken.toUpperCase() === tokenToVerify.trim().toUpperCase());
 
     if (!found) {
       setErrorMessage('Invalid or expired interview token. Please check your invitation email or register on the portal.');
-      return;
+      return false;
     }
 
     setCandidate(found);
@@ -68,7 +68,7 @@ export const CandidatePortal: React.FC<CandidatePortalProps> = ({
     if (found.status === 'EVALUATED' || found.status === 'HIRED' || found.interviewSessionId) {
       setCompletedSessionId(found.interviewSessionId || '');
       setStep('SCORECARD_VIEW');
-      return;
+      return true;
     }
 
     // Fetch Job & Round
@@ -86,6 +86,18 @@ export const CandidatePortal: React.FC<CandidatePortalProps> = ({
     setQuestions(roundQuestions.length > 0 ? roundQuestions : allQuestions.slice(0, 4));
 
     setStep('DIAGNOSTICS');
+    return true;
+  };
+
+  useEffect(() => {
+    if (initialToken) {
+      setTokenInput(initialToken);
+      verifyAndLaunchToken(initialToken);
+    }
+  }, [initialToken]);
+
+  const handleVerifyToken = () => {
+    verifyAndLaunchToken(tokenInput);
   };
 
   const handleDiagnosticsPassed = (diag: any) => {

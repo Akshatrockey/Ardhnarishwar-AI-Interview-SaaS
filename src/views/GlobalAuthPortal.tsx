@@ -6,6 +6,7 @@ import { useLanguage, SUPPORTED_LANGUAGES, SUPPORTED_CURRENCIES, LanguageCode, C
 import { AppDataStore } from '../services/storage';
 import { Candidate, Company, User, UserRole } from '../types';
 import { ArdhnarishwarLogo } from '../components/common/ArdhnarishwarLogo';
+import { ShareLinksModal } from '../components/common/ShareLinksModal';
 import { 
   ShieldCheck, 
   Lock, 
@@ -24,25 +25,47 @@ import {
   Sun,
   Moon,
   Clock,
-  Video
+  Video,
+  Share2
 } from 'lucide-react';
 
 interface GlobalAuthPortalProps {
   onCandidateLaunchChamber: (token: string) => void;
   onAdminLoginSuccess: () => void;
+  initialTab?: 'admin' | 'candidate' | 'company_register' | 'employee_register';
 }
 
 export const GlobalAuthPortal: React.FC<GlobalAuthPortalProps> = ({
   onCandidateLaunchChamber,
-  onAdminLoginSuccess
+  onAdminLoginSuccess,
+  initialTab = 'admin'
 }) => {
   const { switchPersona } = useAuth();
   const { allCompanies, selectCompany } = useTenant();
   const { theme, toggleTheme } = useTheme();
   const { t, language, setLanguage, currency, setCurrency } = useLanguage();
 
-  const [activeMainTab, setActiveMainTab] = useState<'admin' | 'candidate' | 'company_register' | 'employee_register'>('admin');
+  const [activeMainTab, setActiveMainTab] = useState<'admin' | 'candidate' | 'company_register' | 'employee_register'>(initialTab);
   const [candidateSubTab, setCandidateSubTab] = useState<'login' | 'register'>('login');
+  const [showShareModal, setShowShareModal] = useState<boolean>(false);
+
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const portal = params.get('portal');
+    if (portal === 'candidate') {
+      setActiveMainTab('candidate');
+      setCandidateSubTab('register');
+    } else if (portal === 'candidate_login') {
+      setActiveMainTab('candidate');
+      setCandidateSubTab('login');
+    } else if (portal === 'company_register' || portal === 'company') {
+      setActiveMainTab('company_register');
+    } else if (portal === 'employee_register' || portal === 'employee') {
+      setActiveMainTab('employee_register');
+    } else if (portal === 'admin' || portal === 'auth' || portal === 'login') {
+      setActiveMainTab('admin');
+    }
+  }, []);
 
   // Admin form state
   const [adminEmail, setAdminEmail] = useState<string>('admin@ardhnarishwar.ai');
@@ -275,6 +298,16 @@ export const GlobalAuthPortal: React.FC<GlobalAuthPortalProps> = ({
         <ArdhnarishwarLogo size="md" variant="horizontal" showSubtext={true} />
 
         <div className="flex items-center gap-3">
+          {/* Share Links Hub */}
+          <button
+            onClick={() => setShowShareModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-cyan-500/20 via-indigo-500/20 to-purple-500/20 text-cyan-300 border border-cyan-500/40 hover:border-cyan-400 hover:bg-cyan-500/30 transition-all shadow-sm active:scale-95"
+            title="Get 1-Click Shareable Project Links"
+          >
+            <Share2 className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="hidden sm:inline">Share Links</span>
+          </button>
+
           {/* Language Selector */}
           <div className="flex items-center gap-1.5 bg-slate-900/90 border border-slate-800 rounded-xl px-2.5 py-1 text-xs text-slate-300">
             <Globe className="w-3.5 h-3.5 text-cyan-400" />
@@ -737,6 +770,12 @@ export const GlobalAuthPortal: React.FC<GlobalAuthPortalProps> = ({
           <span>Zero External APIs</span>
         </div>
       </footer>
+
+      {/* Share Links Modal */}
+      <ShareLinksModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+      />
     </div>
   );
 };

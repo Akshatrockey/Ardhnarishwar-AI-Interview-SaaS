@@ -6,6 +6,7 @@ import { useRealtime } from '../../context/RealtimeContext';
 import { useLanguage, SUPPORTED_LANGUAGES, SUPPORTED_CURRENCIES, LanguageCode, CurrencyCode } from '../../context/LanguageContext';
 import { ArdhnarishwarLogo } from './ArdhnarishwarLogo';
 import { UserProfileModal } from './UserProfileModal';
+import { ShareLinksModal } from './ShareLinksModal';
 import { 
   Building2, 
   Moon, 
@@ -18,11 +19,12 @@ import {
   AlertTriangle, 
   Globe, 
   Coins, 
-  Clock,
-  Wifi,
-  User as UserIcon,
-  Palette,
-  Video
+  Clock, 
+  Wifi, 
+  User as UserIcon, 
+  Palette, 
+  Video,
+  Share2
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -66,6 +68,7 @@ export const Header: React.FC<HeaderProps> = ({
   const [showPersonaMenu, setShowPersonaMenu] = useState(false);
   const [showThemeMenu, setShowThemeMenu] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
 
   const personas = [
@@ -169,6 +172,16 @@ export const Header: React.FC<HeaderProps> = ({
               </select>
             </div>
           </div>
+
+          {/* Quick Share Links Hub Launcher */}
+          <button
+            onClick={() => setShowShareModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-cyan-500/20 via-indigo-500/20 to-purple-500/20 text-cyan-300 border border-cyan-500/40 hover:border-cyan-400 hover:bg-cyan-500/30 transition-all shadow-sm active:scale-95"
+            title="Get 1-Click Shareable Project Links"
+          >
+            <Share2 className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="hidden sm:inline">Share Links</span>
+          </button>
 
           {/* Quick Candidate Portal Launcher */}
           {handleLaunchChamber && (
@@ -352,6 +365,12 @@ export const Header: React.FC<HeaderProps> = ({
           onLaunchMeeting={onLaunchMeeting}
         />
       )}
+
+      {/* Share Project Links Hub Modal */}
+      <ShareLinksModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+      />
     </>
   );
 };
