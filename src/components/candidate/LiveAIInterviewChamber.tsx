@@ -12,7 +12,8 @@ import {
   VideoOff,
   Clock, 
   ArrowRight, 
-  CheckCircle, 
+  CheckCircle,
+  CheckCircle2, 
   AlertTriangle, 
   Volume2, 
   Sparkles,
@@ -66,6 +67,7 @@ export const LiveAIInterviewChamber: React.FC<LiveAIInterviewChamberProps> = ({
   const [sessionStartTime] = useState<number>(Date.now());
   const [questionStartTime, setQuestionStartTime] = useState<number>(Date.now());
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
+  const [isEvaluatingFinalSession, setIsEvaluatingFinalSession] = useState<boolean>(false);
   const [activeSessionId] = useState<string>(() => `sess_${candidate.id}_${Date.now()}`);
 
   // Live Biometric & Emotion Telemetry state
@@ -282,11 +284,15 @@ export const LiveAIInterviewChamber: React.FC<LiveAIInterviewChamberProps> = ({
     const durationSec = Math.max(10, Math.round((Date.now() - questionStartTime) / 1000));
     const transcriptToEvaluate = currentTranscript.trim() || 'Candidate presented comprehensive architecture for 6-DOF kinematics, Jacobian matrix calculations, and singularity avoidance algorithms.';
 
-    // Evaluate answer with scoring pipeline
+    // Retrieve full benchmark definition configured in AI Training Studio / Question Bank
+    const fullBenchmarkQ = AppDataStore.getQuestions().find(q => q.id === currentQuestion.id) || currentQuestion;
+
+    // Evaluate answer with scoring pipeline against benchmark expected answer & criteria
     const answerResult = evaluateCandidateAnswer(
       transcriptToEvaluate,
-      currentQuestion,
-      durationSec
+      fullBenchmarkQ,
+      durationSec,
+      AppDataStore.getHyperparams()
     );
 
     const newAnswers = [...answers, answerResult];
@@ -301,7 +307,10 @@ export const LiveAIInterviewChamber: React.FC<LiveAIInterviewChamberProps> = ({
     if (currentIdx + 1 < questions.length) {
       setCurrentIdx(currentIdx + 1);
     } else {
-      finalizeInterviewSession(newAnswers);
+      setIsEvaluatingFinalSession(true);
+      setTimeout(() => {
+        finalizeInterviewSession(newAnswers);
+      }, 1500);
     }
   };
 
@@ -316,11 +325,12 @@ export const LiveAIInterviewChamber: React.FC<LiveAIInterviewChamberProps> = ({
       await saveVideoBlob(sessionId, fullBlob);
     }
 
-    // Compile comprehensive AI evaluation report
+    // Compile comprehensive AI evaluation report with Predefined Answers & Passing Criteria
     const evaluationReport = compileSessionEvaluationReport(
       sessionId,
       candidate.id,
-      finalAnswers
+      finalAnswers,
+      round.passingScore || 70
     );
 
     const newSession: InterviewSession = {
@@ -351,6 +361,7 @@ export const LiveAIInterviewChamber: React.FC<LiveAIInterviewChamberProps> = ({
           ...c,
           status: 'EVALUATED' as const,
           interviewSessionId: sessionId,
+          score: evaluationReport.overallScore,
         };
       }
       return c;
@@ -365,7 +376,7 @@ export const LiveAIInterviewChamber: React.FC<LiveAIInterviewChamberProps> = ({
       actorRole: 'CANDIDATE',
       action: 'AI_INTERVIEW_CHAMBER_COMPLETED',
       resource: `Session #${sessionId} (${job.title})`,
-      details: `Completed ${finalAnswers.length} questions. Composite Score: ${evaluationReport.overallScore}%. Recommendation: ${evaluationReport.recommendation}.`,
+      details: `Completed ${finalAnswers.length} questions. Obtained ${evaluationReport.totalObtainedMarks}/${evaluationReport.totalMaxMarks} marks (${evaluationReport.finalPercentage}% - Grade: ${evaluationReport.grade}). Status: ${evaluationReport.isPassed ? 'PASSED' : 'FAILED'}.`,
       ipAddress: '127.0.0.1',
       severity: 'INFO',
     });
@@ -704,6 +715,44 @@ export const LiveAIInterviewChamber: React.FC<LiveAIInterviewChamberProps> = ({
 
         </div>
       </div>
+
+      {/* 4. Automatic Immediate Evaluation Progress Modal */}
+      {isEvaluatingFinalSession && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center p-6 bg-[#030712]/95 backdrop-blur-xl animate-in fade-in text-center space-y-6">
+          <div className="relative">
+            <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-cyan-500 via-indigo-500 to-purple-600 animate-spin p-1 shadow-2xl shadow-cyan-500/30">
+              <div className="w-full h-full rounded-full bg-slate-950 flex items-center justify-center">
+                <Bot className="w-10 h-10 text-cyan-400 animate-pulse" />
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2 max-w-md">
+            <h2 className="text-2xl font-black text-white tracking-tight">Evaluating Interview Responses</h2>
+            <p className="text-xs text-cyan-300 font-mono">
+              Benchmarking against Predefined Enterprise Expected Answers...
+            </p>
+            <div className="space-y-2 pt-4 text-xs text-slate-300 bg-slate-900/80 p-4 rounded-2xl border border-slate-800 text-left">
+              <div className="flex items-center justify-between py-1 border-b border-slate-800">
+                <span>1. Matching transcripts to Predefined Answers</span>
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 animate-pulse" />
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-slate-800">
+                <span>2. Scoring individual evaluation criteria</span>
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 animate-pulse" />
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-slate-800">
+                <span>3. Calculating question marks & total percentage</span>
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 animate-pulse" />
+              </div>
+              <div className="flex items-center justify-between py-1">
+                <span>4. Compiling candidate evaluation dossier</span>
+                <CheckCircle2 className="w-4 h-4 text-cyan-400 animate-spin" />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

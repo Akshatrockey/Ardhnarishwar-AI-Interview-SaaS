@@ -102,6 +102,8 @@ export type QuestionCategory =
   | 'CONTROL_SYSTEMS'
   | 'EMBEDDED_C_CPP';
 
+export type DifficultyLevel = 'EASY' | 'MEDIUM' | 'HARD' | 'EXPERT';
+
 export interface QuestionRubric {
   relevanceWeight: number;       // 0-1
   technicalWeight: number;       // 0-1
@@ -110,20 +112,34 @@ export interface QuestionRubric {
   confidenceWeight: number;      // 0-1
 }
 
+export type QuestionStatus = 'CORRECT' | 'PARTIALLY_CORRECT' | 'INCORRECT' | 'EMPTY';
+
+export type EvaluationGrade = 
+  | 'EXCELLENT'
+  | 'VERY_GOOD'
+  | 'GOOD'
+  | 'AVERAGE'
+  | 'NEEDS_IMPROVEMENT';
+
 export interface Question {
   id: string;
   category: QuestionCategory;
   roleCategory: string; // e.g. "Robotics Engineer", "AI/ML", "ROS2 Developer"
-  difficulty: 'EASY' | 'MEDIUM' | 'HARD';
+  questionType?: string; // 'TECHNICAL' | 'BEHAVIORAL' | 'CONCEPTUAL' | 'CODING' | 'SYSTEM_DESIGN' | 'HR'
+  difficulty: DifficultyLevel;
   title: string;
   prompt: string;
   expectedDurationSec: number;
-  idealBenchmarkAnswer: string;
-  keyConcepts: string[];
+  expectedAnswer: string; // REQUIRED predefined expected answer
+  idealBenchmarkAnswer: string; // Backward compatibility alias
+  evaluationCriteria: string[]; // REQUIRED evaluation criteria points
+  keyConcepts: string[]; // Important keywords / concepts
   antiPatterns: string[];
+  maxScore: number; // Configurable maximum score, e.g. 10 (default: 10)
   rubric: QuestionRubric;
   isGlobal: boolean;
   companyId?: string; // null for Super Admin global bank
+  createdBy?: string;
   createdAt: string;
 }
 
@@ -171,13 +187,23 @@ export interface DimensionScores {
 export interface CandidateAnswer {
   questionId: string;
   questionTitle: string;
+  questionPrompt?: string;
   category: QuestionCategory;
+  questionType?: string;
   videoTimestampStart: number; // in seconds from start
   videoTimestampEnd: number;
   transcript: string;
   durationSec: number;
-  score: number; // 0-100 overall for this question
+  score: number; // 0-100 normalized overall for this question
+  obtainedScore: number; // Marks obtained out of maxScore (e.g. 8.0)
+  maxScore: number; // Maximum marks for this question (e.g. 10)
+  status: QuestionStatus; // 'CORRECT' | 'PARTIALLY_CORRECT' | 'INCORRECT' | 'EMPTY'
+  evaluationReason: string; // Natural language explanation of why score was awarded
   feedback: string;
+  strengths?: string[];
+  improvementSuggestions?: string[];
+  expectedAnswer?: string; // Predefined benchmark stored for HR / review dossier
+  evaluationCriteria?: string[];
   dimensionScores: DimensionScores;
   keyConceptsIdentified: string[];
   missingConcepts: string[];
@@ -243,7 +269,13 @@ export interface AIEvaluationReport {
   sessionId: string;
   candidateId: string;
   aiModelVersionId?: string;
-  overallScore: number;
+  overallScore: number; // 0-100
+  totalObtainedMarks: number; // e.g. 42
+  totalMaxMarks: number; // e.g. 50
+  finalPercentage: number; // e.g. 84.0
+  passingPercentage: number; // e.g. 70.0
+  isPassed: boolean;
+  grade: EvaluationGrade; // 'EXCELLENT' | 'VERY_GOOD' | 'GOOD' | 'AVERAGE' | 'NEEDS_IMPROVEMENT'
   dimensionScores: DimensionScores;
   recommendation: HiringRecommendation;
   strengths: string[];

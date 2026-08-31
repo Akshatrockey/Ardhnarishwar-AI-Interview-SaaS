@@ -246,45 +246,78 @@ export const CandidatePipeline: React.FC<CandidatePipelineProps> = ({
                       )}
                     </td>
 
-                    <td className="py-3.5 px-4 text-right whitespace-nowrap space-x-2">
-                      {onLaunchConference && (c.status === 'SHORTLISTED' || c.status === 'EVALUATED' || c.status === 'HIRED') && (
-                        <button
-                          onClick={() => onLaunchConference(c)}
-                          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-md shadow-purple-600/25 transition-all inline-flex items-center gap-1.5"
-                          title="Connect candidate with HR, Company Admin & Super Admin in Live Zoom Meeting"
-                        >
-                          <Video className="w-3.5 h-3.5" />
-                          <span>Live Zoom Panel</span>
-                        </button>
-                      )}
+                    <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                      <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                        {hasEvaluation && (
+                          <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-lg p-0.5">
+                            <button
+                              onClick={() => {
+                                const updated = candidates.map(cand => cand.id === c.id ? { ...cand, status: 'SHORTLISTED' as CandidateStatus } : cand);
+                                AppDataStore.saveCandidates(updated);
+                                setCandidates(updated);
+                              }}
+                              className={`px-2 py-1 rounded text-[10px] font-bold ${
+                                c.status === 'SHORTLISTED' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-emerald-400'
+                              }`}
+                              title="Mark as Shortlisted"
+                            >
+                              Shortlist
+                            </button>
+                            <button
+                              onClick={() => {
+                                const updated = candidates.map(cand => cand.id === c.id ? { ...cand, status: 'REJECTED' as CandidateStatus } : cand);
+                                AppDataStore.saveCandidates(updated);
+                                setCandidates(updated);
+                              }}
+                              className={`px-2 py-1 rounded text-[10px] font-bold ${
+                                c.status === 'REJECTED' ? 'bg-rose-600 text-white' : 'text-slate-400 hover:text-rose-400'
+                              }`}
+                              title="Mark as Rejected"
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        )}
 
-                      {hasEvaluation ? (
-                        <button
-                          onClick={() => onSelectCandidate(c.id)}
-                          className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 transition-colors inline-flex items-center gap-1"
-                        >
-                          <FileText className="w-3.5 h-3.5" />
-                          <span>View Scorecard</span>
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => onLaunchLiveInterview(c)}
-                          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-white shadow-sm transition-all inline-flex items-center gap-1"
-                          title="Simulate / Run Candidate Interview"
-                        >
-                          <Play className="w-3 h-3" />
-                          <span>Launch Interview</span>
-                        </button>
-                      )}
+                        {onLaunchConference && (c.status === 'SHORTLISTED' || c.status === 'EVALUATED' || c.status === 'HIRED') && (
+                          <button
+                            onClick={() => onLaunchConference(c)}
+                            className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-md transition-all inline-flex items-center gap-1"
+                            title="Connect candidate in live video room"
+                          >
+                            <Video className="w-3.5 h-3.5" />
+                            <span>Panel</span>
+                          </button>
+                        )}
 
-                      <button
-                        onClick={() => copyInviteLink(c)}
-                        className="px-2.5 py-1.5 rounded-lg text-xs bg-slate-800 hover:bg-slate-700 text-slate-400 transition-colors inline-flex items-center gap-1"
-                        title="Copy Candidate Magic Link"
-                      >
-                        <Copy className="w-3.5 h-3.5" />
-                        {copiedToken === c.id ? <span className="text-emerald-400">Copied!</span> : <span>Link</span>}
-                      </button>
+                        {hasEvaluation ? (
+                          <button
+                            onClick={() => onSelectCandidate(c.id)}
+                            className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 transition-colors inline-flex items-center gap-1"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            <span>Scorecard</span>
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => onLaunchLiveInterview(c)}
+                            className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-white shadow-sm transition-all inline-flex items-center gap-1"
+                            title="Run Candidate Interview"
+                          >
+                            <Play className="w-3 h-3" />
+                            <span>Interview</span>
+                          </button>
+                        )}
+
+                        <button
+                          onClick={() => copyInviteLink(c)}
+                          className="px-2 py-1.5 rounded-lg text-xs bg-slate-800 hover:bg-slate-700 text-slate-400 transition-colors inline-flex items-center gap-1"
+                          title="Copy Candidate Magic Link"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                          {copiedToken === c.id ? <span className="text-emerald-400">Copied!</span> : <span>Link</span>}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );

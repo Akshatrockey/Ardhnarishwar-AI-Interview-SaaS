@@ -10,13 +10,15 @@ interface AuthContextType {
   impersonatedBy: User | null;
   isDemoMode: boolean;
   toggleDemoMode: () => void;
-  login: (email: string, role?: UserRole) => boolean;
+  login: (email: string, role?: UserRole, password?: string) => boolean;
+  loginAsCandidate: (tokenOrEmail: string) => { success: boolean; message?: string };
   logout: () => void;
   switchPersona: (userId: string) => { success: boolean; message: string };
   exitImpersonation: () => void;
   isSuperAdmin: boolean;
   isCompanyAdmin: boolean;
   isRecruiter: boolean;
+  isEmployee: boolean;
   isCandidate: boolean;
 }
 
@@ -25,7 +27,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [impersonatedBy, setImpersonatedBy] = useState<User | null>(null);
-  // Production Mode is strictly enforced
   const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
 
   useEffect(() => {
@@ -43,21 +44,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
-    // Default to Super Admin on first load for global access
-    const user = users.find(u => u.id === savedUserId) || users[0] || null;
-    setCurrentUser(user);
+    // If a saved active user exists, rehydrate session; otherwise default to null (Login required)
+    if (savedUserId) {
+      const user = users.find(u => u.id === savedUserId) || null;
+      setCurrentUser(user);
+    } else {
+      setCurrentUser(null);
+    }
   }, []);
 
   const toggleDemoMode = () => {
-    // Production lock active
     setIsDemoMode(false);
   };
 
   /**
    * Secure Enterprise Persona Switching / Authorized Impersonation
-   * Enforces:
-   * 1. When Super Admin impersonates a tenant user, original identity is retained and audited.
-   * 2. Direct switching between authorized roles logs immutable security audit events.
    */
   const switchPersona = (userId: string): { success: boolean; message: string } => {
     const users = AppDataStore.getUsers();
@@ -126,16 +127,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
-  const login = (email: string, role?: UserRole): boolean => {
+  const login = (email: string, requestedRole?: UserRole, _password?: string): boolean => {
     const users = AppDataStore.getUsers();
     let user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
     
-    if (!user && role) {
+    // If user doesn't exist and role is specified (e.g. registration flow), create user safely
+    if (!user && requestedRole) {
+      // Security: Do NOT allow direct self-registration as SUPER_ADMIN
+      const safeRole: UserRole = requestedRole === 'SUPER_ADMIN' ? 'COMPANY_ADMIN' : requestedRole;
+      
       user = {
         id: `usr_${Date.now()}`,
         email,
         name: email.split('@')[0],
-        role,
+        role: safeRole,
+        companyId: safeRole === 'COMPANY_ADMIN' ? 'comp_cyberdyne' : undefined,
         createdAt: new Date().toISOString(),
         status: 'ACTIVE'
       };
@@ -145,16 +151,86 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (user) {
       setCurrentUser(user);
       localStorage.setItem('ardhnarishwar_active_user_id', user.id);
+      
+      AppDataStore.logActivity({
+        companyId: user.companyId,
+        actorId: user.id,
+        actorName: user.name,
+        actorRole: user.role,
+        action: 'AUTH_LOGIN_SUCCESS',
+        resource: `User: ${user.name} (${user.email})`,
+        details: `User logged in successfully with role ${user.role}`,
+        ipAddress: '127.0.0.1',
+        severity: 'INFO'
+      });
       return true;
     }
     return false;
   };
 
+  const loginAsCandidate = (tokenOrEmail: string): { success: boolean; message?: string } => {
+    const candidates = AppDataStore.getCandidates();
+    const trimmed = tokenOrEmail.trim().toUpperCase();
+    
+    const candidate = candidates.find(c => 
+      c.interviewToken.toUpperCase() === trimmed || 
+      c.id.toUpperCase() === trimmed || 
+      c.email.toUpperCase() === trimmed
+    );
+
+    if (!candidate) {
+      return { success: false, message: 'No candidate record found for this token or email.' };
+    }
+
+    // Create / find candidate user session
+    const candidateUser: User = {
+      id: candidate.id,
+      email: candidate.email,
+      name: `${candidate.firstName} ${candidate.lastName}`,
+      role: 'CANDIDATE',
+      companyId: candidate.companyId,
+      createdAt: candidate.appliedAt || new Date().toISOString(),
+      status: 'ACTIVE'
+    };
+
+    setCurrentUser(candidateUser);
+    localStorage.setItem('ardhnarishwar_active_user_id', candidateUser.id);
+    localStorage.setItem('ardhnarishwar_candidate_token', candidate.interviewToken);
+
+    AppDataStore.logActivity({
+      companyId: candidate.companyId,
+      actorId: candidate.id,
+      actorName: `${candidate.firstName} ${candidate.lastName}`,
+      actorRole: 'CANDIDATE',
+      action: 'CANDIDATE_PORTAL_AUTHENTICATED',
+      resource: `Candidate: ${candidate.firstName} ${candidate.lastName} (Token: ${candidate.interviewToken})`,
+      details: 'Candidate authenticated and accessed Candidate Portal',
+      ipAddress: '127.0.0.1',
+      severity: 'INFO'
+    });
+
+    return { success: true };
+  };
+
   const logout = () => {
+    if (currentUser) {
+      AppDataStore.logActivity({
+        companyId: currentUser.companyId,
+        actorId: currentUser.id,
+        actorName: currentUser.name,
+        actorRole: currentUser.role,
+        action: 'AUTH_LOGOUT',
+        resource: `User: ${currentUser.name}`,
+        details: 'User logged out',
+        ipAddress: '127.0.0.1',
+        severity: 'INFO'
+      });
+    }
     setCurrentUser(null);
     setImpersonatedBy(null);
     localStorage.removeItem('ardhnarishwar_active_user_id');
     localStorage.removeItem('ardhnarishwar_impersonator_id');
+    localStorage.removeItem('ardhnarishwar_candidate_token');
   };
 
   const role = currentUser?.role || 'CANDIDATE';
@@ -170,12 +246,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isDemoMode,
         toggleDemoMode,
         login,
+        loginAsCandidate,
         logout,
         switchPersona,
         exitImpersonation,
         isSuperAdmin: role === 'SUPER_ADMIN',
         isCompanyAdmin: role === 'COMPANY_ADMIN',
         isRecruiter: role === 'RECRUITER',
+        isEmployee: role === 'EMPLOYEE',
         isCandidate: role === 'CANDIDATE',
       }}
     >

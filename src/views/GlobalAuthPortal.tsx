@@ -36,8 +36,8 @@ export const GlobalAuthPortal: React.FC<GlobalAuthPortalProps> = ({
   onAdminLoginSuccess,
   initialTab = 'admin'
 }) => {
-  const { switchPersona } = useAuth();
-  const { allCompanies } = useTenant();
+  const { switchPersona, loginAsCandidate } = useAuth();
+  const { allCompanies, selectCompany } = useTenant();
   const { theme, toggleTheme } = useTheme();
   const { language, setLanguage } = useLanguage();
 
@@ -45,6 +45,7 @@ export const GlobalAuthPortal: React.FC<GlobalAuthPortalProps> = ({
   const [candidateSubTab, setCandidateSubTab] = useState<'login' | 'register'>('login');
   const [showShareModal, setShowShareModal] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [selectedTenantId, setSelectedTenantId] = useState<string>('comp_cyberdyne');
 
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -142,6 +143,7 @@ export const GlobalAuthPortal: React.FC<GlobalAuthPortalProps> = ({
     try {
       const result = await authService.verifyCandidateToken(candIdInput);
       if (result.success && result.candidate) {
+        loginAsCandidate(result.candidate.interviewToken || candIdInput);
         onCandidateLaunchChamber(result.candidate.interviewToken);
       } else {
         setCandLoginError(result.message || 'Candidate record not found. Please verify your Candidate ID / Token.');
@@ -388,6 +390,34 @@ export const GlobalAuthPortal: React.FC<GlobalAuthPortalProps> = ({
                   </select>
                 </div>
 
+                {/* Organization / Tenant Selector for Company Roles */}
+                {adminRole !== 'SUPER_ADMIN' && (
+                  <div>
+                    <label className="block text-[11px] font-bold text-indigo-400 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                      <span>Target Organization / Tenant Workspace *</span>
+                      <span className="text-[10px] text-slate-500 font-normal">Tenant Isolated</span>
+                    </label>
+                    <select
+                      value={selectedTenantId}
+                      onChange={(e) => {
+                        setSelectedTenantId(e.target.value);
+                        selectCompany(e.target.value);
+                        // Suggest relevant email for convenience
+                        const users = AppDataStore.getUsers();
+                        const compUser = users.find(u => u.companyId === e.target.value && (u.role === adminRole || u.role === 'COMPANY_ADMIN'));
+                        if (compUser) setAdminEmail(compUser.email);
+                      }}
+                      className="w-full bg-slate-950 border border-indigo-900/80 focus:border-indigo-500 rounded-xl px-4 py-2.5 text-xs text-indigo-200 outline-none font-semibold"
+                    >
+                      {allCompanies.map(c => (
+                        <option key={c.id} value={c.id}>
+                          🏢 {c.name} ({c.domain}) — {c.plan}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 <div>
                   <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
                     Work Email Address
@@ -444,6 +474,121 @@ export const GlobalAuthPortal: React.FC<GlobalAuthPortalProps> = ({
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </form>
+
+              {/* Direct Multi-Tenant Workspace Launchers */}
+              <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-slate-300 flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>Direct Tenant Workspaces (Instant Login):</span>
+                  </span>
+                  <span className="text-[10px] text-slate-500 font-mono">100% Isolated Data</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {allCompanies.slice(0, 4).map(comp => (
+                    <button
+                      key={comp.id}
+                      type="button"
+                      onClick={() => {
+                        selectCompany(comp.id);
+                        const users = AppDataStore.getUsers();
+                        const compUser = users.find(u => u.companyId === comp.id && (u.role === 'COMPANY_ADMIN' || u.role === 'RECRUITER')) || users.find(u => u.role === 'COMPANY_ADMIN');
+                        if (compUser) {
+                          switchPersona(compUser.id);
+                          onAdminLoginSuccess();
+                        }
+                      }}
+                      className="p-2.5 rounded-xl bg-slate-900 hover:bg-indigo-950/50 border border-slate-800 hover:border-indigo-500/60 text-left transition-all group flex items-center justify-between"
+                    >
+                      <div className="space-y-0.5 truncate pr-2">
+                        <div className="text-xs font-bold text-white group-hover:text-indigo-300 truncate flex items-center gap-1">
+                          <span>🏢</span>
+                          <span className="truncate">{comp.name}</span>
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-mono truncate">{comp.domain}</div>
+                      </div>
+                      <span className="text-[10px] font-bold text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 shrink-0">
+                        <span>Enter</span>
+                        <ArrowRight className="w-3 h-3" />
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 1-Click Fast Launch for All 4 Roles */}
+              <div className="pt-2 border-t border-slate-800/80 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-slate-400 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Instant Role Portals:</span>
+                  </span>
+                  <span className="text-[10px] text-slate-500">Zero typing required</span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const users = AppDataStore.getUsers();
+                      const u = users.find(x => x.role === 'SUPER_ADMIN') || users[0];
+                      if (u) { switchPersona(u.id); onAdminLoginSuccess(); }
+                    }}
+                    className="p-2.5 rounded-xl bg-slate-950 hover:bg-cyan-950/40 border border-slate-800 hover:border-cyan-500 text-left transition-all group"
+                  >
+                    <div className="text-[11px] font-black text-amber-400 group-hover:text-amber-300">👑 Super Admin</div>
+                    <div className="text-[9px] text-slate-400 truncate">HQ Master Console</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const users = AppDataStore.getUsers();
+                      const u = users.find(x => x.role === 'COMPANY_ADMIN') || users.find(x => x.role === 'RECRUITER');
+                      if (u) { 
+                        if (u.companyId) selectCompany(u.companyId);
+                        switchPersona(u.id); 
+                        onAdminLoginSuccess(); 
+                      }
+                    }}
+                    className="p-2.5 rounded-xl bg-slate-950 hover:bg-indigo-950/40 border border-slate-800 hover:border-indigo-500 text-left transition-all group"
+                  >
+                    <div className="text-[11px] font-black text-indigo-400 group-hover:text-indigo-300">🏢 Company Admin</div>
+                    <div className="text-[9px] text-slate-400 truncate">Recruiter & Pipeline</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const users = AppDataStore.getUsers();
+                      const u = users.find(x => x.role === 'EMPLOYEE');
+                      if (u) { 
+                        if (u.companyId) selectCompany(u.companyId);
+                        switchPersona(u.id); 
+                        onAdminLoginSuccess(); 
+                      }
+                    }}
+                    className="p-2.5 rounded-xl bg-slate-950 hover:bg-teal-950/40 border border-slate-800 hover:border-teal-500 text-left transition-all group"
+                  >
+                    <div className="text-[11px] font-black text-teal-400 group-hover:text-teal-300">⚙️ Staff Employee</div>
+                    <div className="text-[9px] text-slate-400 truncate">Panels & Punch Desk</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const cands = AppDataStore.getCandidates();
+                      const c = cands[0];
+                      if (c) { onCandidateLaunchChamber(c.interviewToken); }
+                    }}
+                    className="p-2.5 rounded-xl bg-slate-950 hover:bg-emerald-950/40 border border-slate-800 hover:border-emerald-500 text-left transition-all group"
+                  >
+                    <div className="text-[11px] font-black text-emerald-400 group-hover:text-emerald-300">🎓 Candidate</div>
+                    <div className="text-[9px] text-slate-400 truncate">Live AI Chamber</div>
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 

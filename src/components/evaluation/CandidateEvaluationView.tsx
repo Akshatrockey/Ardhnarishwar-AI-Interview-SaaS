@@ -439,16 +439,29 @@ export const CandidateEvaluationView: React.FC<CandidateEvaluationViewProps> = (
               {/* Question Header */}
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-4">
                 <div>
-                  <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800">
-                    Question {selectedQuestionIdx + 1} of {session?.answers.length}
-                  </span>
-                  <h2 className="text-base font-bold text-white mt-1">{currentAnswer.questionTitle}</h2>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800 font-bold">
+                      Question {selectedQuestionIdx + 1} of {session?.answers.length}
+                    </span>
+                    <span className={`px-2.5 py-0.5 rounded text-[10px] font-extrabold border ${
+                      (currentAnswer.status || (currentAnswer.score >= 80 ? 'CORRECT' : currentAnswer.score >= 45 ? 'PARTIALLY_CORRECT' : 'INCORRECT')) === 'CORRECT'
+                        ? 'bg-emerald-950/90 text-emerald-300 border-emerald-700'
+                        : (currentAnswer.status || (currentAnswer.score >= 80 ? 'CORRECT' : currentAnswer.score >= 45 ? 'PARTIALLY_CORRECT' : 'INCORRECT')) === 'PARTIALLY_CORRECT'
+                        ? 'bg-amber-950/90 text-amber-300 border-amber-700'
+                        : 'bg-rose-950/90 text-rose-300 border-rose-700'
+                    }`}>
+                      {(currentAnswer.status || (currentAnswer.score >= 80 ? 'CORRECT' : currentAnswer.score >= 45 ? 'PARTIALLY_CORRECT' : 'INCORRECT')).replace(/_/g, ' ')}
+                    </span>
+                  </div>
+                  <h2 className="text-base font-bold text-white mt-1.5">{currentAnswer.questionTitle}</h2>
                 </div>
 
                 <div className="flex items-center gap-3">
                   <div className="text-right">
                     <div className="text-[10px] text-slate-400 uppercase">Question Score</div>
-                    <div className="text-xl font-extrabold text-cyan-400 font-mono">{currentAnswer.score}/100</div>
+                    <div className="text-xl font-extrabold text-cyan-400 font-mono">
+                      {currentAnswer.obtainedScore ?? Math.round(((currentAnswer.score / 100) * (currentAnswer.maxScore || 10)) * 10) / 10} / {currentAnswer.maxScore || 10} pts
+                    </div>
                   </div>
                 </div>
               </div>
@@ -456,14 +469,38 @@ export const CandidateEvaluationView: React.FC<CandidateEvaluationViewProps> = (
               {/* Candidate Response Transcript */}
               <div className="space-y-2">
                 <div className="text-xs font-bold text-slate-300 flex items-center justify-between">
-                  <span>Candidate Verbatim Transcript</span>
+                  <span>Candidate Verbatim Transcript:</span>
                   <span className="text-[10px] font-mono text-slate-400">
                     Pacing: {currentAnswer.wpm} WPM • Fillers: {currentAnswer.fillerWordCount}
                   </span>
                 </div>
-                <div className="text-xs text-slate-200 leading-relaxed bg-slate-950 p-4 rounded-xl border border-slate-800 font-sans">
+                <div className="text-xs text-slate-200 leading-relaxed bg-slate-950 p-4 rounded-xl border border-slate-800 font-sans italic">
                   "{currentAnswer.transcript}"
                 </div>
+              </div>
+
+              {/* Predefined Expected Answer */}
+              {currentAnswer.expectedAnswer && (
+                <div className="space-y-1.5">
+                  <div className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Predefined Expected Answer (Admin Ground Truth):</span>
+                  </div>
+                  <div className="text-xs text-slate-300 leading-relaxed bg-slate-950/70 p-4 rounded-xl border border-emerald-950/80">
+                    {currentAnswer.expectedAnswer}
+                  </div>
+                </div>
+              )}
+
+              {/* AI Evaluation Reason */}
+              <div className="p-4 rounded-xl bg-cyan-950/30 border border-cyan-900/50 space-y-1.5">
+                <div className="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
+                  <Bot className="w-4 h-4 text-cyan-400" />
+                  AI Evaluation Reason & Scoring Rationale
+                </div>
+                <p className="text-xs text-slate-200 leading-relaxed">
+                  {currentAnswer.evaluationReason || currentAnswer.feedback}
+                </p>
               </div>
 
               {/* Concept Coverage Graph Breakdown */}
@@ -498,17 +535,6 @@ export const CandidateEvaluationView: React.FC<CandidateEvaluationViewProps> = (
                   <div className="text-[10px] text-slate-400 uppercase">Problem Solving</div>
                   <div className="text-base font-bold text-emerald-400">{currentAnswer.dimensionScores.problemSolving}%</div>
                 </div>
-              </div>
-
-              {/* AI Qualitative Feedback */}
-              <div className="p-4 rounded-xl bg-cyan-950/30 border border-cyan-900/50 space-y-1.5">
-                <div className="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
-                  <Bot className="w-4 h-4 text-cyan-400" />
-                  In-House AI Engine Feedback
-                </div>
-                <p className="text-xs text-slate-300 leading-relaxed">
-                  {currentAnswer.feedback}
-                </p>
               </div>
             </div>
           )}

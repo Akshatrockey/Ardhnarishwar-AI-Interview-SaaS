@@ -6,7 +6,9 @@ import {
   AIEvaluationReport, 
   HiringRecommendation, 
   AIEngineHyperparams,
-  AIModelVersion 
+  AIModelVersion,
+  QuestionStatus,
+  EvaluationGrade
 } from '../types';
 import { TfIdfVectorizer, computeCosineSimilarity } from './vectorizer';
 import { matchConceptsAndAntiPatterns } from './semanticMatcher';
@@ -85,14 +87,14 @@ export const REGISTERED_AI_MODEL_VERSIONS: AIModelVersion[] = [
   {
     id: 'aiv_v3_4_0_robotics_core',
     versionTag: 'v3.4.0-robotics-core-evaluator',
-    name: 'Ardhnarishwar Multi-Vector Robotics & STAR Evaluation Suite (Production)',
-    description: 'Current enterprise release: Multi-dimensional scoring with STAR behavioral decomposition, kinematics rubric weighting, and sub-second deterministic reproducibility.',
+    name: 'Ardhnarishwar Predefined Answer Evaluation Suite (Production)',
+    description: 'Enterprise deterministic evaluator strictly benchmarking against Admin/HR predefined expected answers & evaluation criteria.',
     datasetRef: 'ds_robotics_kinematics_v3_4_golden',
     datasetVersion: '3.4.0',
     datasetChecksum: '5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8',
     scoringConfig: {
       weights: { technical: 0.45, relevance: 0.30, communication: 0.25, problemSolving: 0.25, confidence: 0.10, roleCompetency: 0.45 },
-      passingThreshold: 72.0
+      passingThreshold: 70.0
     },
     featureConfig: {
       ngramRange: [1, 2],
@@ -141,6 +143,9 @@ export function computeReproducibilityHash(input: string): string {
   return `hash_sha256_${Math.abs(hash).toString(16).padStart(8, '0')}`;
 }
 
+/**
+ * Evaluates candidate answer strictly against Admin-defined Expected Answer + Evaluation Criteria.
+ */
 export function evaluateCandidateAnswer(
   transcript: string,
   question: Question,
@@ -148,68 +153,135 @@ export function evaluateCandidateAnswer(
   hyperparams: AIEngineHyperparams = DEFAULT_AI_HYPERPARAMS,
   version: AIModelVersion = CURRENT_ACTIVE_AI_VERSION
 ): CandidateAnswer {
-  // 1. Vectorized Semantic Cosine Similarity against Ideal Benchmark
-  const vectorizer = new TfIdfVectorizer([question.idealBenchmarkAnswer, transcript]);
-  const idealVec = vectorizer.transform(question.idealBenchmarkAnswer);
-  const candidateVec = vectorizer.transform(transcript);
+  const maxScore = question.maxScore || 10;
+  const expectedAnswer = question.expectedAnswer || question.idealBenchmarkAnswer || '';
+  const evaluationCriteria = question.evaluationCriteria || [];
+  const keyConcepts = question.keyConcepts || [];
+  const antiPatterns = question.antiPatterns || [];
+  const cleanTranscript = (transcript || '').trim();
+
+  // Handle Empty / Blank / Meaningless answers (Test 4)
+  if (!cleanTranscript || cleanTranscript.length < 5 || cleanTranscript === '...' || cleanTranscript.toLowerCase() === 'no answer') {
+    const emptyDimensions: DimensionScores = {
+      relevance: 0,
+      technicalDepth: 0,
+      communication: 0,
+      problemSolving: 0,
+      confidence: 0,
+      roleCompetency: 0,
+    };
+    return {
+      questionId: question.id,
+      questionTitle: question.title,
+      questionPrompt: question.prompt,
+      category: question.category,
+      questionType: question.questionType || 'TECHNICAL',
+      videoTimestampStart: 0,
+      videoTimestampEnd: durationSec,
+      transcript: cleanTranscript || '(No answer provided)',
+      durationSec,
+      score: 0,
+      obtainedScore: 0,
+      maxScore,
+      status: 'EMPTY',
+      evaluationReason: 'Candidate provided no substantive answer for this question.',
+      feedback: 'No answer recorded. Missing all required concepts and predefined criteria.',
+      strengths: [],
+      improvementSuggestions: ['Ensure you attempt all interview questions to demonstrate your competency.'],
+      expectedAnswer,
+      evaluationCriteria,
+      dimensionScores: emptyDimensions,
+      keyConceptsIdentified: [],
+      missingConcepts: keyConcepts,
+      fillerWordCount: 0,
+      wpm: 0,
+      speechHesitationRatio: 0,
+    };
+  }
+
+  // 1. Vectorized Semantic Cosine Similarity against Predefined Expected Answer
+  const vectorizer = new TfIdfVectorizer([expectedAnswer, cleanTranscript]);
+  const idealVec = vectorizer.transform(expectedAnswer);
+  const candidateVec = vectorizer.transform(cleanTranscript);
   const rawCosine = computeCosineSimilarity(idealVec, candidateVec);
-  
-  // Concept Graph & Terminology Density
+
+  // 2. Concept Graph & Terminology Matching
   const conceptResult = matchConceptsAndAntiPatterns(
-    transcript,
-    question.keyConcepts,
-    question.antiPatterns
+    cleanTranscript,
+    keyConcepts,
+    antiPatterns
   );
 
-  // Scaled relevance score incorporating both semantic vector alignment and concept coverage
-  const cosineComponent = Math.min(100, Math.round(rawCosine * 140));
-  const relevance = Math.min(100, Math.max(10, Math.round(cosineComponent * 0.4 + conceptResult.conceptCoverageScore * 0.6)));
+  // 3. Evaluate Coverage against Predefined Criteria
+  let metCriteriaCount = 0;
+  const lowerTranscript = cleanTranscript.toLowerCase();
+  for (const crit of evaluationCriteria) {
+    const critWords = crit.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+    const matchedWords = critWords.filter(w => lowerTranscript.includes(w));
+    if (critWords.length > 0 && matchedWords.length / critWords.length >= 0.4) {
+      metCriteriaCount++;
+    } else if (rawCosine > 0.45) {
+      metCriteriaCount += 0.8;
+    }
+  }
+  const criteriaCoverageRatio = evaluationCriteria.length > 0
+    ? Math.min(1.0, Math.max(metCriteriaCount / evaluationCriteria.length, (conceptResult.conceptCoverageScore / 100) * 0.9))
+    : 1.0;
 
-  // 2. Technical Depth calculation
-  let technicalDepth = 70;
-  let problemSolving = 70;
+  // 4. Scaled relevance incorporating cosine alignment + concept density + criteria coverage
+  const scaledCosine = Math.min(100, Math.round(rawCosine * 150));
+  const relevance = Math.min(100, Math.max(
+    0,
+    Math.round(conceptResult.conceptCoverageScore * 0.45 + (criteriaCoverageRatio * 100) * 0.35 + scaledCosine * 0.20)
+  ));
+
+  // 5. Technical Depth calculation
+  let technicalDepth = 0;
+  let problemSolving = 0;
   let starAnalysis = undefined;
 
   if (question.category === 'BEHAVIORAL' || question.category === 'HR') {
-    starAnalysis = evaluateSTARStructure(transcript);
+    starAnalysis = evaluateSTARStructure(cleanTranscript);
     problemSolving = Math.min(100, Math.round(starAnalysis.overallStarScore * 1.1));
-    technicalDepth = Math.min(100, Math.round(problemSolving * 0.75 + conceptResult.conceptCoverageScore * 0.25));
+    technicalDepth = Math.min(100, Math.round(problemSolving * 0.70 + conceptResult.conceptCoverageScore * 0.30));
   } else {
     technicalDepth = Math.min(100, Math.round(
-      conceptResult.conceptCoverageScore * 0.85 +
-      conceptResult.technicalKeywordDensity * 0.15
+      conceptResult.conceptCoverageScore * 0.65 +
+      (criteriaCoverageRatio * 100) * 0.35
     ));
     if (conceptResult.antiPatternsDetected.length > 0) {
       const penalty = version.ruleConfig.antiPatternPenalty || hyperparams.customAntiPatternDeduction;
-      technicalDepth = Math.max(10, technicalDepth - (conceptResult.antiPatternsDetected.length * penalty));
+      technicalDepth = Math.max(0, technicalDepth - (conceptResult.antiPatternsDetected.length * penalty));
     }
 
-    // Problem solving for technical / systems / robotics questions
-    const lower = transcript.toLowerCase();
+    // Problem solving detection
     const problemSolvingTriggers = [
       'first', 'then', 'trade-off', 'consider', 'because', 'edge case', 'failsafe', 'redundancy',
       'optimize', 'complexity', 'stability', 'calibration', 'alternative', 'architecture', 'scalability', 'mitigate', 'detect'
     ];
     let matchedTriggers = 0;
     for (const t of problemSolvingTriggers) {
-      if (lower.includes(t)) matchedTriggers++;
+      if (lowerTranscript.includes(t)) matchedTriggers++;
     }
-    problemSolving = Math.min(100, Math.max(45, Math.round(matchedTriggers * 15 + relevance * 0.45)));
+    problemSolving = Math.min(100, Math.max(
+      Math.round(relevance * 0.85),
+      Math.round(matchedTriggers * 15 + relevance * 0.5)
+    ));
   }
 
-  // 3. Fluency & Communication Analysis
-  const fluency = analyzeFluencyAndPacing(transcript, durationSec);
+  // 6. Fluency & Communication Analysis
+  const fluency = analyzeFluencyAndPacing(cleanTranscript, durationSec);
   const communication = Math.round(
     fluency.clarityScore * 0.6 +
     (fluency.wpm > 60 ? fluency.pacingScore * 0.25 : 85 * 0.25) +
     (100 - Math.min(60, fluency.fillerWordRatio * 4)) * 0.15
   );
 
-  // 4. Confidence Indicators
+  // 7. Confidence & Role Competency
   const confidence = Math.min(
     100,
     Math.max(
-      30,
+      20,
       Math.round(
         communication * 0.5 +
         relevance * 0.3 +
@@ -218,7 +290,6 @@ export function evaluateCandidateAnswer(
     )
   );
 
-  // 5. Role Competency (Composite)
   const roleCompetency = Math.round(
     technicalDepth * version.scoringConfig.weights.technical +
     relevance * version.scoringConfig.weights.relevance +
@@ -234,15 +305,59 @@ export function evaluateCandidateAnswer(
     roleCompetency: Math.min(100, Math.max(0, roleCompetency)),
   };
 
-  // Weighted overall question score based on question rubric
+  // Weighted overall normalized score (0-100)
   const r = question.rubric;
-  const overallQuestionScore = Math.round(
+  const overallNormalizedScore = Math.round(
     dimensionScores.relevance * r.relevanceWeight +
     dimensionScores.technicalDepth * r.technicalWeight +
     dimensionScores.communication * r.communicationWeight +
     dimensionScores.problemSolving * r.problemSolvingWeight +
     dimensionScores.confidence * r.confidenceWeight
   );
+
+  const finalNormalizedScore = Math.min(100, Math.max(0, overallNormalizedScore));
+
+  // Determine Question Status & Obtained Marks
+  let status: QuestionStatus = 'INCORRECT';
+  if (finalNormalizedScore >= 80) {
+    status = 'CORRECT';
+  } else if (finalNormalizedScore >= 45) {
+    status = 'PARTIALLY_CORRECT';
+  } else if (finalNormalizedScore > 0) {
+    status = 'INCORRECT';
+  } else {
+    status = 'EMPTY';
+  }
+
+  // Calculate question-level obtained score based on maxScore (e.g. 8/10)
+  const obtainedScore = Math.round(((finalNormalizedScore / 100) * maxScore) * 10) / 10;
+
+  // Generate explainable evaluation reason
+  let evaluationReason = '';
+  if (status === 'CORRECT') {
+    evaluationReason = `Candidate demonstrated thorough comprehension matching the predefined benchmark. Covered ${conceptResult.identifiedConcepts.length} core concepts (${conceptResult.identifiedConcepts.slice(0, 3).join(', ')}) and fulfilled evaluation criteria with strong technical clarity.`;
+  } else if (status === 'PARTIALLY_CORRECT') {
+    const missingStr = conceptResult.missingConcepts.length > 0 ? conceptResult.missingConcepts.slice(0, 2).join(', ') : 'specific benchmark criteria';
+    evaluationReason = `Candidate grasped foundational aspects of the question but omitted critical technical criteria: ${missingStr}. Partial marks (${obtainedScore}/${maxScore}) awarded for demonstrated concepts.`;
+  } else {
+    evaluationReason = `Candidate response diverged significantly from the predefined expected answer. Missed key concepts (${conceptResult.missingConcepts.slice(0, 3).join(', ')}) required by the evaluation rubric.`;
+  }
+
+  const strengths: string[] = [];
+  if (conceptResult.identifiedConcepts.length > 0) {
+    strengths.push(`Identified key concepts: ${conceptResult.identifiedConcepts.slice(0, 3).join(', ')}`);
+  }
+  if (fluency.wpm >= 110 && fluency.wpm <= 170) {
+    strengths.push('Maintained clear, professional pacing and fluent delivery');
+  }
+
+  const improvementSuggestions: string[] = [];
+  if (conceptResult.missingConcepts.length > 0) {
+    improvementSuggestions.push(`Deepen explanation on: ${conceptResult.missingConcepts.slice(0, 3).join(', ')}`);
+  }
+  if (conceptResult.antiPatternsDetected.length > 0) {
+    improvementSuggestions.push(`Avoid anti-patterns: ${conceptResult.antiPatternsDetected.join(', ')}`);
+  }
 
   const feedback = generateQuestionFeedback(
     question,
@@ -256,13 +371,23 @@ export function evaluateCandidateAnswer(
   return {
     questionId: question.id,
     questionTitle: question.title,
+    questionPrompt: question.prompt,
     category: question.category,
+    questionType: question.questionType || 'TECHNICAL',
     videoTimestampStart: 0,
     videoTimestampEnd: durationSec,
-    transcript,
+    transcript: cleanTranscript,
     durationSec,
-    score: Math.min(100, Math.max(10, overallQuestionScore)),
+    score: finalNormalizedScore,
+    obtainedScore,
+    maxScore,
+    status,
+    evaluationReason,
     feedback,
+    strengths,
+    improvementSuggestions,
+    expectedAnswer,
+    evaluationCriteria,
     dimensionScores,
     keyConceptsIdentified: conceptResult.identifiedConcepts,
     missingConcepts: conceptResult.missingConcepts,
@@ -272,10 +397,14 @@ export function evaluateCandidateAnswer(
   };
 }
 
+/**
+ * Compiles session-level aggregated AI Evaluation Report with total marks and passing grading.
+ */
 export function compileSessionEvaluationReport(
   sessionId: string,
   candidateId: string,
   answers: CandidateAnswer[],
+  passingPercentage: number = 70,
   version: AIModelVersion = CURRENT_ACTIVE_AI_VERSION
 ): AIEvaluationReport {
   if (answers.length === 0) {
@@ -285,6 +414,12 @@ export function compileSessionEvaluationReport(
       candidateId,
       aiModelVersionId: version.id,
       overallScore: 0,
+      totalObtainedMarks: 0,
+      totalMaxMarks: 0,
+      finalPercentage: 0,
+      passingPercentage,
+      isPassed: false,
+      grade: 'NEEDS_IMPROVEMENT',
       dimensionScores: {
         relevance: 0,
         technicalDepth: 0,
@@ -310,6 +445,20 @@ export function compileSessionEvaluationReport(
     };
   }
 
+  // 1. Calculate Total Marks & Final Percentage (User Requirement #6)
+  const totalObtainedMarks = Math.round(answers.reduce((s, a) => s + (a.obtainedScore ?? ((a.score / 100) * a.maxScore)), 0) * 10) / 10;
+  const totalMaxMarks = answers.reduce((s, a) => s + (a.maxScore || 10), 0);
+  const finalPercentage = totalMaxMarks > 0 ? Math.round((totalObtainedMarks / totalMaxMarks) * 1000) / 10 : 0;
+  const isPassed = finalPercentage >= passingPercentage;
+
+  // Grade Assignment
+  let grade: EvaluationGrade = 'NEEDS_IMPROVEMENT';
+  if (finalPercentage >= 80) grade = 'EXCELLENT';
+  else if (finalPercentage >= 70) grade = 'VERY_GOOD';
+  else if (finalPercentage >= 60) grade = 'GOOD';
+  else if (finalPercentage >= 50) grade = 'AVERAGE';
+  else grade = 'NEEDS_IMPROVEMENT';
+
   // Aggregate dimension averages
   const count = answers.length;
   const agg: DimensionScores = {
@@ -321,19 +470,13 @@ export function compileSessionEvaluationReport(
     roleCompetency: Math.round(answers.reduce((s, a) => s + a.dimensionScores.roleCompetency, 0) / count),
   };
 
-  const overallScore = Math.round(
-    agg.technicalDepth * 0.35 +
-    agg.problemSolving * 0.25 +
-    agg.relevance * 0.15 +
-    agg.communication * 0.15 +
-    agg.confidence * 0.10
-  );
+  const overallScore = Math.round(finalPercentage);
 
   let recommendation: HiringRecommendation = 'LEANING_HIRE';
-  if (overallScore >= 88) recommendation = 'STRONG_HIRE';
-  else if (overallScore >= 75) recommendation = 'HIRE';
-  else if (overallScore >= 62) recommendation = 'LEANING_HIRE';
-  else if (overallScore >= 48) recommendation = 'LEANING_NO_HIRE';
+  if (finalPercentage >= 85) recommendation = 'STRONG_HIRE';
+  else if (finalPercentage >= 70) recommendation = 'HIRE';
+  else if (finalPercentage >= 55) recommendation = 'LEANING_HIRE';
+  else if (finalPercentage >= 45) recommendation = 'LEANING_NO_HIRE';
   else recommendation = 'STRONG_NO_HIRE';
 
   // Extract aggregated strengths, weaknesses & red flags
@@ -344,14 +487,14 @@ export function compileSessionEvaluationReport(
   const weaknesses: string[] = [];
   const redFlags: string[] = [];
 
-  if (agg.technicalDepth >= 75) strengths.push(`Demonstrates solid technical command across ${allIdentified.slice(0, 3).join(', ')}.`);
-  if (agg.communication >= 80) strengths.push('Articulates engineering logic with high structural clarity and minimal speech fillers.');
-  if (agg.problemSolving >= 75) strengths.push('Systematic problem formulation with clear understanding of trade-offs and edge cases.');
-  if (agg.confidence >= 80) strengths.push('Exhibits composed, assertive delivery under timed interview conditions.');
+  if (agg.technicalDepth >= 70) strengths.push(`Demonstrates solid technical command across ${allIdentified.slice(0, 3).join(', ')}.`);
+  if (agg.communication >= 75) strengths.push('Articulates engineering logic with high structural clarity and minimal speech fillers.');
+  if (agg.problemSolving >= 70) strengths.push('Systematic problem formulation with clear understanding of trade-offs and edge cases.');
+  if (agg.confidence >= 75) strengths.push('Exhibits composed, assertive delivery under timed interview conditions.');
 
-  if (agg.technicalDepth < 65) weaknesses.push(`Omitted core architectural concepts: ${allMissing.slice(0, 3).join(', ')}.`);
-  if (agg.communication < 65) weaknesses.push('High frequency of filler words and fragmented phrasing during technical explanation.');
-  if (agg.problemSolving < 60) weaknesses.push('Superficial approach to edge cases and failure mode handling.');
+  if (agg.technicalDepth < 60) weaknesses.push(`Omitted core architectural concepts: ${allMissing.slice(0, 3).join(', ')}.`);
+  if (agg.communication < 60) weaknesses.push('High frequency of filler words and fragmented phrasing during technical explanation.');
+  if (agg.problemSolving < 55) weaknesses.push('Superficial approach to edge cases and failure mode handling.');
 
   // Red flags
   const highFillers = answers.filter(a => a.fillerWordCount > 8);
@@ -362,7 +505,7 @@ export function compileSessionEvaluationReport(
   const executiveSummary = generateExecutiveSummary(overallScore, agg, recommendation, allIdentified, allMissing);
 
   // Compute immutable reproducibility hash
-  const snapshotPayload = `${sessionId}_${version.versionTag}_${overallScore}_${JSON.stringify(agg)}`;
+  const snapshotPayload = `${sessionId}_${version.versionTag}_${overallScore}_${totalObtainedMarks}_${totalMaxMarks}_${JSON.stringify(agg)}`;
   const reproducibilityHash = computeReproducibilityHash(snapshotPayload);
 
   return {
@@ -371,6 +514,12 @@ export function compileSessionEvaluationReport(
     candidateId,
     aiModelVersionId: version.id,
     overallScore,
+    totalObtainedMarks,
+    totalMaxMarks,
+    finalPercentage,
+    passingPercentage,
+    isPassed,
+    grade,
     dimensionScores: agg,
     recommendation,
     strengths,

@@ -493,11 +493,14 @@ export const CandidateScorecardView: React.FC<CandidateScorecardViewProps> = ({
         <div className="space-y-3">
           {session.answers.map((ans, idx) => {
             const isExpanded = expandedQuestionIdx === idx;
+            const status = ans.status || (ans.score >= 80 ? 'CORRECT' : ans.score >= 45 ? 'PARTIALLY_CORRECT' : 'INCORRECT');
+            const obtainedScore = ans.obtainedScore ?? Math.round(((ans.score / 100) * (ans.maxScore || 10)) * 10) / 10;
+            const maxScore = ans.maxScore || 10;
 
             return (
               <div
                 key={idx}
-                className="rounded-2xl bg-slate-950 border border-slate-800 overflow-hidden transition-all"
+                className="rounded-2xl bg-slate-950 border border-slate-800 overflow-hidden transition-all shadow-md"
               >
                 {/* Header Row */}
                 <button
@@ -505,12 +508,12 @@ export const CandidateScorecardView: React.FC<CandidateScorecardViewProps> = ({
                   className="w-full p-4 flex items-center justify-between text-left hover:bg-slate-900/50 transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="w-7 h-7 rounded-lg bg-slate-900 text-cyan-400 font-mono font-bold flex items-center justify-center text-xs border border-slate-800">
+                    <span className="w-8 h-8 rounded-xl bg-slate-900 text-cyan-400 font-mono font-bold flex items-center justify-center text-xs border border-slate-800 shrink-0">
                       Q{idx + 1}
                     </span>
                     <div>
                       <div className="text-xs font-bold text-slate-200">{ans.questionTitle}</div>
-                      <div className="text-[10px] text-slate-400 font-mono flex items-center gap-2 mt-0.5">
+                      <div className="text-[10px] text-slate-400 font-mono flex items-center gap-2 mt-0.5 flex-wrap">
                         <span className="text-slate-300 uppercase">{ans.category}</span>
                         <span>•</span>
                         <span>{ans.durationSec || 45}s Duration</span>
@@ -520,34 +523,78 @@ export const CandidateScorecardView: React.FC<CandidateScorecardViewProps> = ({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3">
-                    <span className="px-2.5 py-1 rounded-xl text-xs font-black font-mono bg-cyan-950 text-cyan-300 border border-cyan-800">
-                      {ans.score}%
+                  <div className="flex items-center gap-2.5">
+                    {/* Status Badge */}
+                    <span className={`px-2.5 py-1 rounded-xl text-[10px] font-extrabold border ${
+                      status === 'CORRECT'
+                        ? 'bg-emerald-950/90 text-emerald-300 border-emerald-700'
+                        : status === 'PARTIALLY_CORRECT'
+                        ? 'bg-amber-950/90 text-amber-300 border-amber-700'
+                        : status === 'EMPTY'
+                        ? 'bg-slate-900 text-slate-400 border-slate-700'
+                        : 'bg-rose-950/90 text-rose-300 border-rose-700'
+                    }`}>
+                      {status.replace(/_/g, ' ')}
                     </span>
+
+                    {/* Score (Obtained / Max) */}
+                    <span className="px-3 py-1 rounded-xl text-xs font-black font-mono bg-cyan-950 text-cyan-300 border border-cyan-800">
+                      {obtainedScore} / {maxScore} pts
+                    </span>
+
                     {isExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
                   </div>
                 </button>
 
                 {/* Expanded Content */}
                 {isExpanded && (
-                  <div className="p-4 pt-0 border-t border-slate-800/80 space-y-3 text-xs animate-in fade-in">
+                  <div className="p-4 pt-0 border-t border-slate-800/80 space-y-3.5 text-xs animate-in fade-in">
                     
-                    {/* Transcript Box */}
-                    <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
-                      <div className="text-[10px] font-mono text-cyan-400 font-bold uppercase">Candidate Response Transcript:</div>
+                    {/* 1. Candidate Answer Transcript Box */}
+                    <div className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 space-y-1">
+                      <div className="text-[10px] font-mono text-cyan-400 font-bold uppercase flex items-center justify-between">
+                        <span>Candidate Response (Voice Transcript):</span>
+                        <span className="text-slate-400 font-normal">{ans.transcript.split(' ').filter(Boolean).length} words</span>
+                      </div>
                       <p className="text-slate-200 leading-relaxed italic">
                         "{ans.transcript}"
                       </p>
                     </div>
 
-                    {/* Identified Concepts & Feedback */}
+                    {/* 2. Predefined Expected Answer (Ground Truth) */}
+                    {ans.expectedAnswer && (
+                      <div className="p-3.5 rounded-2xl bg-slate-900/70 border border-emerald-950/80 space-y-1">
+                        <div className="text-[10px] font-mono text-emerald-400 font-bold uppercase flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Predefined Expected Answer (Admin Benchmark):</span>
+                        </div>
+                        <p className="text-slate-300 leading-relaxed">
+                          {ans.expectedAnswer}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* 3. Evaluation Reason (Explainable AI Result) */}
+                    <div className="p-3.5 rounded-2xl bg-cyan-950/30 border border-cyan-900/50 space-y-1">
+                      <div className="text-[10px] font-mono text-cyan-300 font-bold uppercase">
+                        AI Evaluation Reason:
+                      </div>
+                      <p className="text-slate-200 leading-relaxed">
+                        {ans.evaluationReason || ans.feedback}
+                      </p>
+                    </div>
+
+                    {/* 4. Predefined Criteria Checklist & Concept Graphs */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* Concepts Identified */}
                       <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1.5">
-                        <div className="text-[10px] font-mono text-emerald-400 font-bold uppercase">Concepts Mastered:</div>
+                        <div className="text-[10px] font-mono text-emerald-400 font-bold uppercase">
+                          Concepts Identified ({ans.keyConceptsIdentified?.length || 0}):
+                        </div>
                         <div className="flex flex-wrap gap-1">
                           {(ans.keyConceptsIdentified && ans.keyConceptsIdentified.length > 0 
                             ? ans.keyConceptsIdentified 
-                            : ['ROS2 Node Architecture', 'Zero-Copy Pub/Sub', 'Topic Latency']
+                            : ['Fundamental understanding']
                           ).map((c, ci) => (
                             <span key={ci} className="px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-300 text-[10px] font-mono border border-emerald-800/70">
                               ✓ {c}
@@ -556,23 +603,27 @@ export const CandidateScorecardView: React.FC<CandidateScorecardViewProps> = ({
                         </div>
                       </div>
 
-                      <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1">
-                        <div className="text-[10px] font-mono text-cyan-400 font-bold uppercase">AI Dimension Breakdown:</div>
-                        <div className="grid grid-cols-2 gap-1 text-[11px]">
-                          <span className="text-slate-400">Technical: <strong className="text-slate-200">{ans.dimensionScores.technicalDepth}%</strong></span>
-                          <span className="text-slate-400">Relevance: <strong className="text-slate-200">{ans.dimensionScores.relevance}%</strong></span>
-                          <span className="text-slate-400">Comm: <strong className="text-slate-200">{ans.dimensionScores.communication}%</strong></span>
-                          <span className="text-slate-400">Problem: <strong className="text-slate-200">{ans.dimensionScores.problemSolving}%</strong></span>
+                      {/* Missing Concepts */}
+                      <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1.5">
+                        <div className="text-[10px] font-mono text-amber-400 font-bold uppercase">
+                          Missing Criteria ({ans.missingConcepts?.length || 0}):
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {ans.missingConcepts && ans.missingConcepts.length > 0 ? (
+                            ans.missingConcepts.map((mc, mi) => (
+                              <span key={mi} className="px-2 py-0.5 rounded bg-amber-950/80 text-amber-300 text-[10px] font-mono border border-amber-800/70">
+                                ✗ {mc}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-[10px] text-emerald-400 font-mono italic">
+                              None! All required concepts covered.
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
 
-                    {/* Feedback commentary */}
-                    {ans.feedback && (
-                      <div className="text-[11px] text-slate-300 bg-slate-900/40 p-2.5 rounded-xl border border-slate-800/60">
-                        <strong className="text-cyan-400">Feedback: </strong>{ans.feedback}
-                      </div>
-                    )}
                   </div>
                 )}
               </div>

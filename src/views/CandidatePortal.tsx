@@ -7,6 +7,7 @@ import { CandidateScorecardView } from '../components/evaluation/CandidateScorec
 import { LiveVideoConferenceRoom } from '../components/conference/LiveVideoConferenceRoom';
 import { ArdhnarishwarLogo } from '../components/common/ArdhnarishwarLogo';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import { useRealtime } from '../context/RealtimeContext';
 import { 
   Bot, 
@@ -38,7 +39,8 @@ import {
   GraduationCap,
   Save,
   Plus,
-  Trash2
+  Trash2,
+  LogOut
 } from 'lucide-react';
 
 interface CandidatePortalProps {
@@ -52,10 +54,11 @@ export const CandidatePortal: React.FC<CandidatePortalProps> = ({
   initialToken = '',
   onViewEvaluation,
 }) => {
+  const { currentUser, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { latencyMs } = useRealtime();
 
-  const [activePortalTab, setActivePortalTab] = useState<'chamber' | 'profile' | 'history'>('chamber');
+  const [activePortalTab, setActivePortalTab] = useState<'dashboard' | 'applications' | 'chamber' | 'profile' | 'history'>('dashboard');
   const [tokenInput, setTokenInput] = useState<string>(initialToken);
   const [candidate, setCandidate] = useState<Candidate | null>(null);
   const [job, setJob] = useState<JobPosition | null>(null);
@@ -81,8 +84,32 @@ export const CandidatePortal: React.FC<CandidatePortalProps> = ({
 
   const allSessions = AppDataStore.getSessions();
   const allCandidates = AppDataStore.getCandidates();
+  const allJobs = AppDataStore.getJobs();
 
-  const verifyAndLaunchToken = (tokenToVerify: string) => {
+  // Auto-detect candidate from logged in user or saved token
+  useEffect(() => {
+    const savedToken = localStorage.getItem('ardhnarishwar_candidate_token') || initialToken;
+    if (savedToken) {
+      setTokenInput(savedToken);
+      verifyAndLaunchToken(savedToken, false);
+    } else if (currentUser && currentUser.role === 'CANDIDATE') {
+      const found = allCandidates.find(c => c.id === currentUser.id || c.email.toLowerCase() === currentUser.email.toLowerCase()) || allCandidates[0];
+      if (found) {
+        setCandidate(found);
+        setProfileFirstName(found.firstName);
+        setProfileLastName(found.lastName);
+        setProfileEmail(found.email);
+        setProfilePhone(found.phone || '');
+        setProfileSkills((found.skills || []).join(', '));
+        setProfileExperienceYears(found.yearsOfExperience || 0);
+
+        const foundJob = allJobs.find(j => j.id === found.jobId) || allJobs[0];
+        setJob(foundJob);
+      }
+    }
+  }, [currentUser, initialToken]);
+
+  const verifyAndLaunchToken = (tokenToVerify: string, autoStart: boolean = true) => {
     setErrorMessage('');
     const trimmed = tokenToVerify.trim().toUpperCase();
     if (!trimmed) {
@@ -93,7 +120,7 @@ export const CandidatePortal: React.FC<CandidatePortalProps> = ({
     const allCand = AppDataStore.getCandidates();
     const found = allCand.find(c => 
       c.interviewToken.toUpperCase() === trimmed || 
-      c.id.toUpperCase() === trimmed ||
+      c.id.toUpperCase() === trimmed || 
       c.email.toUpperCase() === trimmed
     );
 
@@ -110,15 +137,7 @@ export const CandidatePortal: React.FC<CandidatePortalProps> = ({
     setProfileSkills((found.skills || []).join(', '));
     setProfileExperienceYears(found.yearsOfExperience || 0);
 
-    // If candidate has already completed interview, jump directly to Scorecard & Result!
-    if (found.status === 'EVALUATED' || found.status === 'HIRED' || found.interviewSessionId) {
-      setCompletedSessionId(found.interviewSessionId || '');
-      setStep('SCORECARD_VIEW');
-      return true;
-    }
-
     // Fetch Job & Round
-    const allJobs = AppDataStore.getJobs();
     const foundJob = allJobs.find(j => j.id === found.jobId) || allJobs[0];
     setJob(foundJob);
 
@@ -126,24 +145,41 @@ export const CandidatePortal: React.FC<CandidatePortalProps> = ({
     const foundRound = allRounds.find(r => r.jobId === foundJob.id) || allRounds[0];
     setRound(foundRound);
 
-    // Fetch Questions
+    // Fetch Questions and sanitize
     const allQuestions = AppDataStore.getQuestions();
     const roundQuestions = allQuestions.filter(q => foundRound.questionIds.includes(q.id));
-    setQuestions(roundQuestions.length > 0 ? roundQuestions : allQuestions.slice(0, 4));
+    const rawQuestions = roundQuestions.length > 0 ? roundQuestions : allQuestions.slice(0, 4);
+    const sanitized = AppDataStore.sanitizeQuestionsForCandidate(rawQuestions);
+    setQuestions(sanitized);
 
-    setStep('DIAGNOSTICS');
+    // If candidate has already completed interview, jump directly to Scorecard & Result
+    if (found.status === 'EVALUATED' || found.status === 'HIRED' || found.interviewSessionId) {
+      setCompletedSessionId(found.interviewSessionId || '');
+      if (autoStart) {
+        setStep('SCORECARD_VIEW');
+        setActivePortalTab('chamber');
+      }
+      return true;
+    }
+
+    if (autoStart) {
+      setStep('DIAGNOSTICS');
+      setActivePortalTab('chamber');
+    }
     return true;
   };
 
-  useEffect(() => {
-    if (initialToken) {
-      setTokenInput(initialToken);
-      verifyAndLaunchToken(initialToken);
-    }
-  }, [initialToken]);
-
   const handleVerifyToken = () => {
-    verifyAndLaunchToken(tokenInput);
+    verifyAndLaunchToken(tokenInput, true);
+  };
+
+  const handleStartInterviewFromDashboard = () => {
+    if (candidate) {
+      verifyAndLaunchToken(candidate.interviewToken, true);
+    } else {
+      setActivePortalTab('chamber');
+      setStep('TOKEN_ENTRY');
+    }
   };
 
   const handleSaveProfile = (e: React.FormEvent) => {
@@ -183,17 +219,41 @@ export const CandidatePortal: React.FC<CandidatePortalProps> = ({
           <ArdhnarishwarLogo size="sm" variant="horizontal" showSubtext={false} />
           <div className="h-4 w-px bg-slate-800 hidden sm:block" />
           <span className="text-xs font-mono text-cyan-400 bg-cyan-950/60 border border-cyan-800/60 px-2.5 py-0.5 rounded-full font-bold">
-            Candidate Experience Portal
+            Candidate Portal
           </span>
         </div>
 
-        {/* Portal Tabs */}
-        <div className="flex items-center gap-1.5 p-1 bg-slate-950/90 border border-slate-800 rounded-xl">
+        {/* Portal Navigation Tabs */}
+        <div className="hidden md:flex items-center gap-1.5 p-1 bg-slate-950/90 border border-slate-800 rounded-xl text-xs font-bold">
+          <button
+            onClick={() => setActivePortalTab('dashboard')}
+            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+              activePortalTab === 'dashboard'
+                ? 'bg-cyan-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Briefcase className="w-3.5 h-3.5" />
+            <span>Dashboard</span>
+          </button>
+
+          <button
+            onClick={() => setActivePortalTab('applications')}
+            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+              activePortalTab === 'applications'
+                ? 'bg-indigo-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>My Applications</span>
+          </button>
+
           <button
             onClick={() => setActivePortalTab('chamber')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
               activePortalTab === 'chamber'
-                ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-md'
+                ? 'bg-emerald-600 text-white shadow-md'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
@@ -202,35 +262,43 @@ export const CandidatePortal: React.FC<CandidatePortalProps> = ({
           </button>
 
           <button
+            onClick={() => setActivePortalTab('history')}
+            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+              activePortalTab === 'history'
+                ? 'bg-purple-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Award className="w-3.5 h-3.5" />
+            <span>My Results</span>
+          </button>
+
+          <button
             onClick={() => setActivePortalTab('profile')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
               activePortalTab === 'profile'
-                ? 'bg-gradient-to-r from-cyan-500 to-indigo-600 text-white shadow-md'
+                ? 'bg-slate-700 text-white shadow-md'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             <User className="w-3.5 h-3.5" />
-            <span>My Profile & Skills</span>
-          </button>
-
-          <button
-            onClick={() => setActivePortalTab('history')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-              activePortalTab === 'history'
-                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <TrendingUp className="w-3.5 h-3.5" />
-            <span>Scores & History</span>
+            <span>Profile</span>
           </button>
         </div>
 
+        {/* Right User & Logout Controls */}
         <div className="flex items-center gap-3">
-          {/* WebSocket Status */}
-          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-950 border border-slate-800 text-[11px] font-mono text-emerald-400 font-bold">
-            <Wifi className="w-3.5 h-3.5" />
-            <span>WS LIVE ({latencyMs}ms)</span>
+          {/* User Profile Badge */}
+          <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-xl bg-slate-950 border border-slate-800 text-xs">
+            <div className="w-6 h-6 rounded-full bg-cyan-600 flex items-center justify-center font-bold text-white text-[10px]">
+              {(candidate?.firstName || currentUser?.name || 'C')[0]}
+            </div>
+            <div className="text-left">
+              <div className="font-bold text-slate-200 leading-tight">
+                {candidate ? `${candidate.firstName} ${candidate.lastName}` : (currentUser?.name || 'Candidate')}
+              </div>
+              <div className="text-[10px] text-cyan-400 font-mono">Role: Candidate</div>
+            </div>
           </div>
 
           {/* Theme Toggle */}
@@ -242,21 +310,207 @@ export const CandidatePortal: React.FC<CandidatePortalProps> = ({
             {theme === 'enterprise-light' ? <Moon className="w-4 h-4 text-indigo-400" /> : <Sun className="w-4 h-4 text-amber-400" />}
           </button>
 
-          {onBackToApp && (
-            <button
-              onClick={onBackToApp}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
-            >
-              <ChevronLeft className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Platform Home</span>
-            </button>
-          )}
+          <button
+            onClick={() => {
+              if (onBackToApp) onBackToApp();
+              else logout();
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-950/80 hover:bg-rose-900 border border-rose-800 text-rose-300 transition-colors"
+            title="Logout from Candidate Portal"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Logout</span>
+          </button>
         </div>
       </header>
 
       {/* Main Content Body */}
       <main className="flex-1 p-3 sm:p-6 max-w-7xl w-full mx-auto">
         
+        {/* TAB 0: CANDIDATE DASHBOARD */}
+        {activePortalTab === 'dashboard' && (
+          <div className="space-y-6 animate-in fade-in">
+            {/* Welcome Banner */}
+            <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border border-slate-800 shadow-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+              <div className="space-y-2">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-bold">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Candidate Portal • Welcome</span>
+                </div>
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-white">
+                  Welcome, {candidate ? `${candidate.firstName} ${candidate.lastName}` : (currentUser?.name || 'Applicant')}!
+                </h1>
+                <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">
+                  Track your job applications, complete autonomous AI-proctored technical interviews, and review your instant evaluation scorecards.
+                </p>
+              </div>
+
+              <button
+                onClick={handleStartInterviewFromDashboard}
+                className="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-extrabold text-xs shadow-xl shadow-emerald-500/20 transition-all flex items-center gap-2 active:scale-95 whitespace-nowrap"
+              >
+                <Bot className="w-4 h-4" />
+                <span>{candidate?.status === 'EVALUATED' ? 'View Interview Scorecard' : 'Start AI Interview'}</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Metric Summary Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
+                <div className="text-[11px] font-bold text-slate-400 uppercase">Target Job Position</div>
+                <div className="text-base font-extrabold text-white truncate">{job?.title || 'Perception Engineer'}</div>
+                <div className="text-[11px] text-cyan-400">{job?.department || 'Autonomous Systems'}</div>
+              </div>
+
+              <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
+                <div className="text-[11px] font-bold text-slate-400 uppercase">Application Status</div>
+                <div className="flex items-center gap-2">
+                  <span className={`px-2.5 py-1 rounded-full text-xs font-mono font-bold ${
+                    candidate?.status === 'SHORTLISTED' || candidate?.status === 'HIRED'
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                      : candidate?.status === 'EVALUATED'
+                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                      : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                  }`}>
+                    {candidate?.status || 'SHORTLISTED'}
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-400">Application verified</div>
+              </div>
+
+              <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
+                <div className="text-[11px] font-bold text-slate-400 uppercase">Interview Token</div>
+                <div className="text-sm font-mono font-bold text-emerald-400 truncate">
+                  {candidate?.interviewToken || 'TOKEN_AVAILABLE'}
+                </div>
+                <div className="text-[11px] text-slate-400">Use to re-enter chamber</div>
+              </div>
+
+              <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
+                <div className="text-[11px] font-bold text-slate-400 uppercase">AI Evaluation Result</div>
+                <div className="text-2xl font-black text-cyan-400 font-mono">
+                  {candidateSessions.length > 0 && candidateSessions[0].overallScore ? `${candidateSessions[0].overallScore}%` : 'Pending'}
+                </div>
+                <div className="text-[11px] text-slate-400">
+                  {candidateSessions.length > 0 ? 'Passing benchmark met' : 'Complete interview to view score'}
+                </div>
+              </div>
+            </div>
+
+            {/* Action Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="p-6 rounded-3xl bg-slate-900 border border-slate-800 space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 font-bold">
+                    <Bot className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white">AI Technical Interview Chamber</h3>
+                    <p className="text-xs text-slate-400">Conduct your structured interview with instant evaluation against predefined benchmarks.</p>
+                  </div>
+                </div>
+                <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-xs text-slate-300 space-y-2">
+                  <div className="flex items-center gap-2 text-emerald-400 font-semibold">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Camera & Mic Hardware Diagnostics Ready</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-cyan-400 font-semibold">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Structured Questions with Benchmark Rubrics</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-indigo-400 font-semibold">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Instant Result Scorecard upon Completion</span>
+                  </div>
+                </div>
+                <button
+                  onClick={handleStartInterviewFromDashboard}
+                  className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-all shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2"
+                >
+                  <Bot className="w-4 h-4" />
+                  <span>Enter Chamber Now</span>
+                </button>
+              </div>
+
+              <div className="p-6 rounded-3xl bg-slate-900 border border-slate-800 space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 font-bold">
+                    <FileText className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white">Candidate Profile & Dossier</h3>
+                    <p className="text-xs text-slate-400">Keep your resume, skills, and portfolio updated for hiring team review.</p>
+                  </div>
+                </div>
+                <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-xs text-slate-300 space-y-2">
+                  <div><strong>Education:</strong> {profileEducation}</div>
+                  <div><strong>Experience:</strong> {profileExperienceYears} Years</div>
+                  <div><strong>Skills:</strong> {profileSkills}</div>
+                </div>
+                <button
+                  onClick={() => setActivePortalTab('profile')}
+                  className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-all shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2"
+                >
+                  <User className="w-4 h-4" />
+                  <span>Update Profile & Skills</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 0.5: MY APPLICATIONS */}
+        {activePortalTab === 'applications' && (
+          <div className="space-y-6 animate-in fade-in">
+            <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-extrabold text-white">My Job Applications</h2>
+                <p className="text-xs text-slate-400 mt-1">Review the status of your job applications and proceed with assigned interview rounds.</p>
+              </div>
+              <span className="text-xs font-mono px-3 py-1 rounded-xl bg-slate-950 border border-slate-800 text-cyan-400">
+                1 Application Active
+              </span>
+            </div>
+
+            <div className="rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden divide-y divide-slate-800/60">
+              <div className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base font-bold text-white">{job?.title || 'Lead Robotics Perception Engineer'}</span>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      {candidate?.status || 'SHORTLISTED'}
+                    </span>
+                  </div>
+                  <div className="text-xs text-slate-400 flex items-center gap-3">
+                    <span>Department: {job?.department || 'Robotics Division'}</span>
+                    <span>•</span>
+                    <span>Location: {job?.location || 'San Francisco, CA / Remote'}</span>
+                    <span>•</span>
+                    <span>Applied: {new Date(candidate?.appliedAt || Date.now()).toLocaleDateString()}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={handleStartInterviewFromDashboard}
+                    className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-all shadow-lg shadow-emerald-600/20 flex items-center gap-1.5"
+                  >
+                    <Bot className="w-3.5 h-3.5" />
+                    <span>{candidate?.status === 'EVALUATED' ? 'View Scorecard' : 'Launch AI Chamber'}</span>
+                  </button>
+                  <button
+                    onClick={() => setActivePortalTab('profile')}
+                    className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs border border-slate-700 transition-colors"
+                  >
+                    View Dossier
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* TAB 1: AI INTERVIEW CHAMBER */}
         {activePortalTab === 'chamber' && (
           <div>

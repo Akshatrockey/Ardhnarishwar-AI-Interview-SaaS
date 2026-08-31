@@ -88,7 +88,7 @@ def get_current_user(
     MANDATORY ZERO-TRUST AUTHENTICATION DEPENDENCY:
     1. Extracts Bearer token from 'Authorization' header.
     2. Validates cryptographic HMAC signature.
-    3. Re-verifies user existence and active status in MySQL database.
+    3. Re-verifies user existence and active status in database.
     4. Anti-Spoofing: If the client attempts to pass 'X-Actor-Role' or 'X-Actor-Company-Id'
        that contradicts the JWT, the request is IMMEDIATELY BLOCKED.
     """
@@ -131,12 +131,10 @@ def get_current_user(
     verified_company_id = user.company_id
 
     # 3. ANTI-SPOOFING HEADER ATTACK DEFENSE
-    # Check if untrusted client attempted to inject conflicting X-Actor headers
     client_spoofed_role = request.headers.get("x-actor-role")
     client_spoofed_company = request.headers.get("x-actor-company-id")
 
     if client_spoofed_role and client_spoofed_role != verified_role:
-        # Emit Security Incident Log
         print(f"[SECURITY ALERT] Header Role Spoofing Attempt: Client {user_id} sent '{client_spoofed_role}' but JWT is '{verified_role}'")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -173,11 +171,25 @@ def require_super_admin(
     return current_user
 
 
+def require_company_admin(
+    current_user: AuthenticatedIdentity = Depends(get_current_user)
+) -> AuthenticatedIdentity:
+    """
+    Restricts access to Super Admin or Company Admin.
+    """
+    if current_user.role not in ("SUPER_ADMIN", "COMPANY_ADMIN"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access Denied: Company Admin privileges required."
+        )
+    return current_user
+
+
 def require_recruiter_or_admin(
     current_user: AuthenticatedIdentity = Depends(get_current_user)
 ) -> AuthenticatedIdentity:
     """
-    Restricts access to Super Admin, Company Admin, or Recruiter.
+    Restricts access to Super Admin, Company Admin, or Recruiter / HR Manager.
     """
     if current_user.role not in ("SUPER_ADMIN", "COMPANY_ADMIN", "RECRUITER", "HR_MANAGER"):
         raise HTTPException(
@@ -185,3 +197,49 @@ def require_recruiter_or_admin(
             detail="Access Denied: Recruiter or Company Admin privileges required."
         )
     return current_user
+
+
+def require_staff_or_admin(
+    current_user: AuthenticatedIdentity = Depends(get_current_user)
+) -> AuthenticatedIdentity:
+    """
+    Restricts access to Staff (Employee), Recruiters, or Admins.
+    """
+    if current_user.role not in ("SUPER_ADMIN", "COMPANY_ADMIN", "RECRUITER", "HR_MANAGER", "EMPLOYEE"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access Denied: Staff or Admin privileges required."
+        )
+    return current_user
+
+
+def require_candidate(
+    current_user: AuthenticatedIdentity = Depends(get_current_user)
+) -> AuthenticatedIdentity:
+    """
+    Ensures candidate identity is authenticated.
+    """
+    if current_user.role not in ("CANDIDATE", "SUPER_ADMIN"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access Denied: Candidate privileges required."
+        )
+    return current_user
+
+
+def verify_tenant_isolation(
+    current_user: AuthenticatedIdentity,
+    target_company_id: Optional[str]
+):
+    """
+    Enforces strict multi-tenant boundary.
+    Super Admins can access all tenants; Company Admins and Staff can only access their own company.
+    """
+    if current_user.role == "SUPER_ADMIN":
+        return
+
+    if not target_company_id or current_user.company_id != target_company_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access Denied: Tenant Isolation Policy prevents cross-organization resource access."
+        )

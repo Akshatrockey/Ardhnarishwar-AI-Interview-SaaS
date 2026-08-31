@@ -166,10 +166,35 @@ export class AppDataStore {
 
   // Questions
   static getQuestions(): Question[] {
-    return getStored<Question[]>(STORAGE_KEYS.QUESTIONS, ALL_INITIAL_QUESTIONS);
+    const raw = getStored<Question[]>(STORAGE_KEYS.QUESTIONS, ALL_INITIAL_QUESTIONS);
+    // Automatic migration & normalization to guarantee expectedAnswer, criteria, and maxScore
+    return raw.map(q => ({
+      ...q,
+      expectedAnswer: q.expectedAnswer || q.idealBenchmarkAnswer || 'Standard benchmark answer defined by administrator.',
+      idealBenchmarkAnswer: q.idealBenchmarkAnswer || q.expectedAnswer || 'Standard benchmark answer defined by administrator.',
+      evaluationCriteria: (q.evaluationCriteria && q.evaluationCriteria.length > 0)
+        ? q.evaluationCriteria
+        : [
+            `Demonstrates fundamental understanding of ${q.title}`,
+            `Explains core concepts accurately: ${q.keyConcepts.slice(0, 3).join(', ')}`,
+            'Provides structured, logical technical reasoning'
+          ],
+      maxScore: q.maxScore || 10,
+      questionType: q.questionType || (q.category === 'BEHAVIORAL' || q.category === 'HR' ? 'BEHAVIORAL' : 'TECHNICAL'),
+    }));
   }
   static saveQuestions(questions: Question[]): void {
     setStored(STORAGE_KEYS.QUESTIONS, questions);
+  }
+
+  // Candidate Security: Strip Expected Answer, Criteria, Keywords & Rubric for candidate chamber views
+  static sanitizeQuestionForCandidate(q: Question): Omit<Question, 'expectedAnswer' | 'idealBenchmarkAnswer' | 'evaluationCriteria' | 'keyConcepts' | 'antiPatterns' | 'rubric'> {
+    const { expectedAnswer, idealBenchmarkAnswer, evaluationCriteria, keyConcepts, antiPatterns, rubric, ...safeQuestion } = q;
+    return safeQuestion as any;
+  }
+
+  static sanitizeQuestionsForCandidate(qs: Question[]): Question[] {
+    return qs.map(q => this.sanitizeQuestionForCandidate(q) as unknown as Question);
   }
 
   // Candidates

@@ -19,6 +19,7 @@ export const InterviewRoundsConfig: React.FC = () => {
   const [rounds, setRounds] = useState<InterviewRound[]>(AppDataStore.getRounds());
   const questions = AppDataStore.getQuestions();
   const [showAddModal, setShowAddModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // New Round Form
   const [name, setName] = useState('');
@@ -26,6 +27,7 @@ export const InterviewRoundsConfig: React.FC = () => {
   const [timeLimitMinutes, setTimeLimitMinutes] = useState(20);
   const [passingScore, setPassingScore] = useState(70);
   const [proctoringStrictness, setProctoringStrictness] = useState<'STANDARD' | 'STRICT' | 'MILITARY_GRADE'>('MILITARY_GRADE');
+  const [selectedQIds, setSelectedQIds] = useState<string[]>(['q_rob_01', 'q_rob_02', 'q_rob_03', 'q_hr_01']);
 
   const filteredRounds = rounds.filter(r => 
     !currentCompany || r.companyId === currentCompany.id || currentCompany.id === 'comp_ardhnarishwar'
@@ -35,6 +37,18 @@ export const InterviewRoundsConfig: React.FC = () => {
     e.preventDefault();
     if (!currentCompany) return;
 
+    if (selectedQIds.length === 0) {
+      setErrorMessage('Please assign at least one question to this round.');
+      return;
+    }
+
+    // Validation: Verify all assigned questions have an Expected Answer (User Requirement #11)
+    const invalidQuestions = questions.filter(q => selectedQIds.includes(q.id) && !q.expectedAnswer && !q.idealBenchmarkAnswer);
+    if (invalidQuestions.length > 0) {
+      setErrorMessage(`Cannot publish round: ${invalidQuestions.length} question(s) lack a predefined Expected Answer.`);
+      return;
+    }
+
     const newRound: InterviewRound = {
       id: `rnd_${Date.now()}`,
       companyId: currentCompany.id,
@@ -43,7 +57,7 @@ export const InterviewRoundsConfig: React.FC = () => {
       roundNumber: filteredRounds.length + 1,
       type,
       timeLimitMinutes,
-      questionIds: ['q_rob_01', 'q_rob_02', 'q_rob_03', 'q_hr_01'],
+      questionIds: selectedQIds,
       passingScore,
       allowRetake: false,
       proctoringStrictness,
@@ -54,6 +68,7 @@ export const InterviewRoundsConfig: React.FC = () => {
     setRounds([newRound, ...rounds]);
     setShowAddModal(false);
     setName('');
+    setErrorMessage(null);
   };
 
   return (
