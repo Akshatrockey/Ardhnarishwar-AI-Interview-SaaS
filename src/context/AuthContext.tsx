@@ -127,26 +127,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
-  const login = (email: string, requestedRole?: UserRole, _password?: string): boolean => {
+  const login = (email: string, _requestedRole?: UserRole, _password?: string): boolean => {
     const users = AppDataStore.getUsers();
-    let user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
-    
-    // If user doesn't exist and role is specified (e.g. registration flow), create user safely
-    if (!user && requestedRole) {
-      // Security: Do NOT allow direct self-registration as SUPER_ADMIN
-      const safeRole: UserRole = requestedRole === 'SUPER_ADMIN' ? 'COMPANY_ADMIN' : requestedRole;
-      
-      user = {
-        id: `usr_${Date.now()}`,
-        email,
-        name: email.split('@')[0],
-        role: safeRole,
-        companyId: safeRole === 'COMPANY_ADMIN' ? 'comp_cyberdyne' : undefined,
-        createdAt: new Date().toISOString(),
-        status: 'ACTIVE'
-      };
-      AppDataStore.saveUsers([...users, user]);
-    }
+    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase().trim());
 
     if (user) {
       setCurrentUser(user);

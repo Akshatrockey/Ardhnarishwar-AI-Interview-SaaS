@@ -19,7 +19,7 @@ const TenantContext = createContext<TenantContextType | undefined>(undefined);
 export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { currentUser, isSuperAdmin } = useAuth();
   const [allCompanies, setAllCompanies] = useState<Company[]>([]);
-  const [activeCompanyId, setActiveCompanyId] = useState<string>('comp_cyberdyne');
+  const [activeCompanyId, setActiveCompanyId] = useState<string>('');
 
   const refreshTenantData = () => {
     const companies = AppDataStore.getCompanies();
@@ -35,9 +35,8 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (currentUser && currentUser.companyId) {
       setActiveCompanyId(currentUser.companyId);
     } else if (isSuperAdmin) {
-      // Keep selected or fallback to cyberdyne for demonstration
       if (!activeCompanyId && allCompanies.length > 0) {
-        setActiveCompanyId(allCompanies[1]?.id || allCompanies[0].id);
+        setActiveCompanyId(allCompanies[0]?.id || '');
       }
     }
   }, [currentUser, isSuperAdmin, allCompanies]);

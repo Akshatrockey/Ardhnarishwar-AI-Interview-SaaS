@@ -18,10 +18,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . ./
 
 # Create persistent storage directories
-RUN mkdir -p /storage/recordings && chmod -R 777 /storage/recordings
+RUN mkdir -p /storage/recordings /storage/resumes && chmod -R 777 /storage
 
 ENV PYTHONUNBUFFERED=1
 ENV RECORDING_STORAGE_ROOT=/storage/recordings
+ENV RESUME_STORAGE_ROOT=/storage/resumes
 
 EXPOSE 8000
 

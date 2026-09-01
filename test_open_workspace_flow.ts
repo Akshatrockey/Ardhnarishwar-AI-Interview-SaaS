@@ -9,13 +9,74 @@
  */
 
 import { AppDataStore } from './src/services/storage';
+import { Company, User } from './src/types';
 
 console.log('================================================================');
 console.log('  TESTING SUPER ADMIN OPEN WORKSPACE & SECURITY CONTROLS        ');
 console.log('================================================================');
 
-// Initialize store
+// Initialize store and test seed
 AppDataStore.init();
+
+const mockCompanies: Company[] = [
+  {
+    id: 'comp_cyberdyne',
+    name: 'Cyberdyne Autonomous Systems',
+    slug: 'cyberdyne',
+    domain: 'cyberdyne.io',
+    contactEmail: 'admin@cyberdyne.io',
+    contactPerson: 'Dr. Miles Bennett',
+    industry: 'Autonomous Systems & Robotics',
+    planId: 'plan_enterprise',
+    status: 'ACTIVE',
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'comp_boston_bio',
+    name: 'Boston BioRobotics Labs',
+    slug: 'boston-biorobotics',
+    domain: 'bostonbio.com',
+    contactEmail: 'contact@bostonbio.com',
+    contactPerson: 'Sarah Jenkins',
+    industry: 'Biotechnology & Prosthetics',
+    planId: 'plan_growth',
+    status: 'ACTIVE',
+    createdAt: new Date().toISOString()
+  }
+];
+
+const mockUsers: User[] = [
+  {
+    id: 'usr_super_admin',
+    name: 'Ardhnarishwar Super Admin',
+    email: 'admin@ardhnarishwar.ai',
+    role: 'SUPER_ADMIN',
+    status: 'ACTIVE',
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'usr_cyberdyne_admin',
+    companyId: 'comp_cyberdyne',
+    name: 'Dr. Miles Bennett',
+    email: 'admin@cyberdyne.io',
+    role: 'COMPANY_ADMIN',
+    status: 'ACTIVE',
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'usr_boston_admin',
+    companyId: 'comp_boston_bio',
+    name: 'Sarah Jenkins',
+    email: 'contact@bostonbio.com',
+    role: 'COMPANY_ADMIN',
+    status: 'ACTIVE',
+    createdAt: new Date().toISOString()
+  }
+];
+
+AppDataStore.saveCompanies(mockCompanies);
+AppDataStore.saveUsers(mockUsers);
+
 const companies = AppDataStore.getCompanies();
 const users = AppDataStore.getUsers();
 

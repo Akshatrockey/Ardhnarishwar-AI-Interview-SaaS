@@ -6,8 +6,9 @@
 
 import { Candidate, Company, User, UserRole } from '../types';
 import { AppDataStore } from './storage';
+import { ApiClient } from './apiClient';
 
-const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000';
+const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || '';
 
 export interface LoginResult {
   success: boolean;
@@ -25,10 +26,13 @@ export interface CandidateVerifyResult {
 export interface CandidateRegisterPayload {
   name: string;
   email: string;
+  password?: string;
   phone?: string;
   jobId?: string;
+  skillCategory?: 'SKILLED' | 'UNSKILLED' | 'SEMI_SKILLED';
   yearsOfExperience: number;
   skills: string;
+  resumeId?: string;
   resumeFileName?: string;
 }
 
@@ -38,6 +42,16 @@ export interface CompanyRegisterPayload {
   contactEmail: string;
   contactPerson: string;
   industry: string;
+  phone?: string;
+  password?: string;
+}
+
+export interface SuperAdminRegisterPayload {
+  name: string;
+  email: string;
+  password?: string;
+  designation?: string;
+  platformName?: string;
 }
 
 export interface EmployeeRegisterPayload {
@@ -60,7 +74,7 @@ class AuthService {
    * Real Enterprise Login with Production Backend & Database Verification
    */
   async login(email: string, password: string, role?: UserRole): Promise<LoginResult> {
-    const trimmedEmail = email.trim();
+    const trimmedEmail = email.trim().toLowerCase();
     const trimmedPassword = password.trim();
 
     if (!trimmedEmail || !trimmedPassword) {
@@ -88,7 +102,8 @@ class AuthService {
           role: (data.role as UserRole) || role || 'COMPANY_ADMIN',
           companyId: data.company_id || undefined,
           createdAt: new Date().toISOString(),
-          status: 'ACTIVE'
+          status: 'ACTIVE',
+          designation: data.designation || undefined
         };
 
         AppDataStore.saveUsers([authenticatedUser, ...AppDataStore.getUsers().filter(u => u.id !== authenticatedUser.id)]);
@@ -113,30 +128,17 @@ class AuthService {
         if (response.status === 401 || response.status === 400 || response.status === 403) {
           return {
             success: false,
-            message: errData.detail || 'Invalid work email or password. Please verify your credentials.'
+            message: errData.detail || 'Invalid work email or password. Please register your account first.'
           };
         }
       }
     } catch (err) {
-      console.warn('Backend API connection check: Proceeding with client datastore validation.', err);
+      console.warn('Backend API connection check: Checking local registered accounts.', err);
     }
 
-    // 2. Synchronized Datastore Validation (Seamless for dev & production environments)
+    // 2. Synchronized Datastore Validation (Zero demo auto-provisioning)
     const existingUsers = AppDataStore.getUsers();
-    let localUser = existingUsers.find(u => u.email.toLowerCase() === trimmedEmail.toLowerCase());
-
-    // Super Admin auto-provisioning / validation
-    if (!localUser && (trimmedEmail.toLowerCase().includes('admin') || role === 'SUPER_ADMIN')) {
-      localUser = {
-        id: `usr_super_${Date.now()}`,
-        email: trimmedEmail,
-        name: trimmedEmail.split('@')[0].toUpperCase(),
-        role: role || 'SUPER_ADMIN',
-        createdAt: new Date().toISOString(),
-        status: 'ACTIVE'
-      };
-      AppDataStore.saveUsers([localUser, ...existingUsers]);
-    }
+    const localUser = existingUsers.find(u => u.email.toLowerCase() === trimmedEmail);
 
     if (localUser) {
       localStorage.setItem('ardhnarishwar_active_user_id', localUser.id);
@@ -156,8 +158,62 @@ class AuthService {
 
     return {
       success: false,
-      message: 'Account not found. Please verify your registered work email and password.'
+      message: 'Account not found for this email. Please register your account first!'
     };
+  }
+
+  /**
+   * Super Administrator / Platform Owner Registration
+   */
+  async registerSuperAdmin(payload: SuperAdminRegisterPayload): Promise<{ success: boolean; user?: User; message?: string }> {
+    const { name, email, password, designation } = payload;
+    if (!name.trim() || !email.trim()) {
+      return { success: false, message: 'Please provide Full Name and Email Address.' };
+    }
+
+    const superAdminId = `usr_super_${Math.floor(1000 + Math.random() * 9000)}`;
+    const superAdminUser: User = {
+      id: superAdminId,
+      email: email.trim().toLowerCase(),
+      name: name.trim(),
+      role: 'SUPER_ADMIN',
+      designation: designation?.trim() || 'Platform Owner & Super Administrator',
+      createdAt: new Date().toISOString(),
+      status: 'ACTIVE'
+    };
+
+    try {
+      await fetch(`${API_BASE_URL}/api/v1/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          name: name.trim(),
+          password: password || 'SuperAdmin@123',
+          role: 'SUPER_ADMIN',
+          designation: superAdminUser.designation
+        })
+      });
+    } catch (e) {
+      // Offline fallback
+    }
+
+    const existingUsers = AppDataStore.getUsers();
+    AppDataStore.saveUsers([superAdminUser, ...existingUsers.filter(u => u.email !== superAdminUser.email)]);
+    localStorage.setItem('ardhnarishwar_active_user_id', superAdminUser.id);
+
+    AppDataStore.logActivity({
+      actorId: superAdminUser.id,
+      actorName: superAdminUser.name,
+      actorRole: 'SUPER_ADMIN',
+      action: 'PLATFORM_SUPER_ADMIN_REGISTERED',
+      resource: `Super Admin: ${superAdminUser.email}`,
+      details: `Primary Platform Super Administrator created with ID ${superAdminId}.`,
+      ipAddress: '127.0.0.1',
+      severity: 'WARNING'
+    });
+
+    return { success: true, user: superAdminUser };
   }
 
   /**
@@ -206,7 +262,7 @@ class AuthService {
    * Real Candidate Self-Registration
    */
   async registerCandidate(payload: CandidateRegisterPayload): Promise<{ success: boolean; candidate?: Candidate; message?: string }> {
-    const { name, email, phone, jobId, yearsOfExperience, skills, resumeFileName } = payload;
+    const { name, email, phone, jobId, skillCategory, yearsOfExperience, skills, resumeId, resumeFileName } = payload;
     if (!name.trim() || !email.trim()) {
       return { success: false, message: 'Please provide both Full Name and Email address.' };
     }
@@ -219,18 +275,61 @@ class AuthService {
     const lastName = nameParts.slice(1).join(' ') || 'Applicant';
 
     const numericId = Math.floor(1000 + Math.random() * 9000);
-    const candidateId = `cand_${numericId}`;
-    const token = `TOKEN_${numericId}_${firstName.toUpperCase()}`;
+    let candidateId = `cand_${numericId}`;
+    let token = `TOKEN_${numericId}_${firstName.toUpperCase()}`;
+
+    // Try applying directly to production backend API
+    try {
+      if (targetJob?.id) {
+        const backendRes = await ApiClient.applyForJob({
+          first_name: firstName,
+          last_name: lastName,
+          email: email.trim().toLowerCase(),
+          phone: phone?.trim() || undefined,
+          job_id: targetJob.id,
+          skill_category: (skillCategory || 'SKILLED').toUpperCase(),
+          years_of_experience: Number(yearsOfExperience) || 0,
+          skills: skills ? skills.split(',').map(s => s.trim()).filter(Boolean) : [],
+          resume_id: resumeId || undefined,
+        });
+
+        if (backendRes.data?.success) {
+          candidateId = backendRes.data.candidate_id || candidateId;
+          token = backendRes.data.interview_token || token;
+        }
+      }
+
+      // Also register candidate user account with password if provided
+      await fetch(`${API_BASE_URL}/api/v1/auth/register-candidate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: candidateId,
+          company_id: targetJob?.companyId,
+          job_id: targetJob?.id,
+          first_name: firstName,
+          last_name: lastName,
+          email: email.trim().toLowerCase(),
+          phone: phone?.trim() || undefined,
+          years_of_experience: Number(yearsOfExperience) || 0,
+          interview_token: token,
+          password: payload.password
+        })
+      });
+    } catch (e) {
+      // Backend offline fallback handled gracefully
+    }
 
     const newCand: Candidate = {
       id: candidateId,
-      companyId: targetJob?.companyId || 'comp_cyberdyne',
-      jobId: targetJob?.id || 'job_cyber_01',
+      companyId: targetJob?.companyId || 'comp_ardhnarishwar',
+      jobId: targetJob?.id || 'job_default',
       firstName,
       lastName,
       email: email.trim(),
       phone: phone?.trim() || '',
-      currentTitle: `${yearsOfExperience > 2 ? 'Senior' : 'Junior'} ${targetJob?.title || 'Engineer'}`,
+      skillCategory: skillCategory || 'SKILLED',
+      currentTitle: `${yearsOfExperience > 2 ? 'Senior' : 'Junior'} ${targetJob?.title || 'Applicant'}`,
       yearsOfExperience: Number(yearsOfExperience) || 0,
       status: 'SHORTLISTED',
       interviewToken: token,
@@ -239,17 +338,6 @@ class AuthService {
       skills: skills ? skills.split(',').map(s => s.trim()).filter(Boolean) : [],
       meetingRoomId: `ROOM-PANEL-${firstName.toUpperCase()}-${lastName.toUpperCase()}-2026`
     };
-
-    // Try sending to backend
-    try {
-      await fetch(`${API_BASE_URL}/api/v1/auth/register-candidate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newCand)
-      });
-    } catch (e) {
-      // Offline fallback
-    }
 
     const existing = AppDataStore.getCandidates();
     AppDataStore.saveCandidates([newCand, ...existing]);
@@ -260,8 +348,8 @@ class AuthService {
       actorName: name,
       actorRole: 'CANDIDATE',
       action: 'CANDIDATE_SELF_REGISTERED',
-      resource: `Candidate ID #${numericId} for ${targetJob?.title || 'Position'}`,
-      details: `Self-service application submitted. Generated invitation token: ${token}.`,
+      resource: `Candidate ID #${candidateId} for ${targetJob?.title || 'Position'}`,
+      details: `Self-service application submitted with ${resumeFileName ? `resume "${resumeFileName}"` : 'standard profile'}. Token: ${token}.`,
       ipAddress: '127.0.0.1',
       severity: 'INFO'
     });
@@ -273,7 +361,7 @@ class AuthService {
    * Real Company / Organization Registration
    */
   async registerCompany(payload: CompanyRegisterPayload): Promise<{ success: boolean; company?: Company; adminUser?: User; message?: string }> {
-    const { name, domain, contactEmail, contactPerson, industry } = payload;
+    const { name, domain, contactEmail, contactPerson, industry, password } = payload;
     if (!name.trim() || !contactEmail.trim()) {
       return { success: false, message: 'Please provide both Company Name and Official Contact Email.' };
     }
@@ -314,7 +402,13 @@ class AuthService {
       await fetch(`${API_BASE_URL}/api/v1/auth/register-company`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ company: newCompany, admin: newAdminUser })
+        body: JSON.stringify({ 
+          company: newCompany, 
+          admin: { 
+            ...newAdminUser, 
+            password: password || 'SecureCompanyPass2026!' 
+          } 
+        })
       });
     } catch (e) {
       // Local fallback

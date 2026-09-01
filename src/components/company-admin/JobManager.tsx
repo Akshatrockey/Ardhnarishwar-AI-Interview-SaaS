@@ -47,6 +47,7 @@ export const JobManager: React.FC = () => {
   const [location, setLocation] = useState('San Francisco, CA / Hybrid');
   const [jobType, setJobType] = useState<'FULL_TIME' | 'CONTRACT' | 'REMOTE' | 'HYBRID'>('FULL_TIME');
   const [experienceLevel, setExperienceLevel] = useState<ExperienceLevel>('SENIOR');
+  const [skillCategory, setSkillCategory] = useState<'SKILLED' | 'UNSKILLED' | 'SEMI_SKILLED'>('SKILLED');
   const [salaryRange, setSalaryRange] = useState('$140,000 - $180,000 / Year');
   const [openings, setOpenings] = useState<number>(2);
   const [deadline, setDeadline] = useState<string>('2026-12-31');
@@ -90,6 +91,7 @@ export const JobManager: React.FC = () => {
       location,
       type: jobType,
       experienceLevel,
+      skillCategory,
       description,
       requiredSkills: skillsStr.split(',').map(s => s.trim()).filter(Boolean),
       status: 'DRAFT', // Starts as draft until validated with questions
@@ -832,6 +834,43 @@ export const JobManager: React.FC = () => {
                     <option value="LEAD">Lead / Staff (8+ Yrs)</option>
                     <option value="PRINCIPAL">Principal / Director</option>
                   </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-300">Skill Track & Classification</label>
+                <div className="grid grid-cols-2 gap-2 mt-1">
+                  <button
+                    type="button"
+                    onClick={() => setSkillCategory('SKILLED')}
+                    className={`p-2 rounded-xl border text-xs font-bold transition-all text-left flex items-center gap-2 ${
+                      skillCategory === 'SKILLED'
+                        ? 'bg-cyan-950 border-cyan-500 text-white'
+                        : 'bg-slate-950 border-slate-800 text-slate-400'
+                    }`}
+                  >
+                    <span>🛠️</span>
+                    <div>
+                      <div>Skilled Technical</div>
+                      <div className="text-[10px] text-slate-500 font-normal">Engineering, Code, Systems</div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSkillCategory('UNSKILLED')}
+                    className={`p-2 rounded-xl border text-xs font-bold transition-all text-left flex items-center gap-2 ${
+                      skillCategory === 'UNSKILLED'
+                        ? 'bg-emerald-950 border-emerald-500 text-white'
+                        : 'bg-slate-950 border-slate-800 text-slate-400'
+                    }`}
+                  >
+                    <span>👷</span>
+                    <div>
+                      <div>General Workforce</div>
+                      <div className="text-[10px] text-slate-500 font-normal">Assembly, Logistics, Operations</div>
+                    </div>
+                  </button>
                 </div>
               </div>
 

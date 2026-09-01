@@ -76,7 +76,17 @@ const AppContent: React.FC = () => {
     setShowLandingPage(false);
   };
 
-  // 1. Landing Page View (Commercial SaaS Showcase)
+  // 1. Direct Token Candidate AI Chamber Link (?token=...) or Chamber launch button clicked
+  if (candidateTokenForChamber) {
+    return (
+      <CandidatePortal
+        initialToken={candidateTokenForChamber}
+        onBackToApp={handleLogout}
+      />
+    );
+  }
+
+  // 2. Landing Page View (Commercial SaaS Showcase)
   if (showLandingPage) {
     return (
       <LandingPage
@@ -94,7 +104,7 @@ const AppContent: React.FC = () => {
     );
   }
 
-  // 2. FIRST SCREEN: If user is not authenticated, show Login / Auth Portal (Zero Dashboard Exposure)
+  // 3. FIRST SCREEN: If user is not authenticated, show Login / Auth Portal (Zero Dashboard Exposure)
   if (!isAuthenticated || !currentUser) {
     return (
       <GlobalAuthPortal

@@ -50,33 +50,16 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [latencyMs, setLatencyMs] = useState<number>(18);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
   const [presenceStats, setPresenceStats] = useState({
-    totalConnected: 4,
-    superAdmins: 1,
-    companyAdmins: 1,
-    recruiters: 1,
-    employees: 1,
-    candidates: 1,
-    activeRooms: 3,
+    totalConnected: 0,
+    superAdmins: 0,
+    companyAdmins: 0,
+    recruiters: 0,
+    employees: 0,
+    candidates: 0,
+    activeRooms: 0,
   });
 
-  const [activeTelemetryMap, setActiveTelemetryMap] = useState<Record<string, RealtimeTelemetry>>({
-    'sess_priya_01': {
-      candidateId: 'cand_priya_01',
-      candidateName: 'Priya Sharma',
-      sessionId: 'sess_priya_01',
-      companyId: 'comp_cyberdyne',
-      questionIndex: 2,
-      questionTitle: '6-DOF Inverse Kinematics & Singularity Avoidance',
-      wpm: 138,
-      confidencePct: 91,
-      audioVolume: 65,
-      faceVisible: true,
-      isAiSpeaking: false,
-      liveTranscriptChunk: 'We compute the Jacobian determinant and apply damped least squares when approaching kinematic singularities...',
-      runningScore: 88,
-      timestamp: Date.now()
-    }
-  });
+  const [activeTelemetryMap, setActiveTelemetryMap] = useState<Record<string, RealtimeTelemetry>>({});
 
   const [proctorAlerts, setProctorAlerts] = useState<RealtimeProctorFlag[]>([]);
   const [latestIntercom, setLatestIntercom] = useState<RealtimeIntercomMessage | null>(null);

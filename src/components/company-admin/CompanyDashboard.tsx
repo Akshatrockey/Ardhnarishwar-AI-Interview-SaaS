@@ -12,7 +12,8 @@ import {
   Plus, 
   FileText,
   Clock,
-  Sparkles
+  Sparkles,
+  Inbox
 } from 'lucide-react';
 
 interface CompanyDashboardProps {
@@ -32,9 +33,9 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
     !currentCompany || j.companyId === currentCompany.id || currentCompany.id === 'comp_ardhnarishwar'
   );
 
-  const evaluated = candidates.filter(c => c.status === 'EVALUATED' || c.status === 'SHORTLISTED' || c.status === 'REJECTED');
-  const shortlisted = candidates.filter(c => c.status === 'SHORTLISTED');
-  const pending = candidates.filter(c => c.status === 'INVITED');
+  const evaluated = candidates.filter(c => c.status === 'EVALUATED' || c.status === 'SHORTLISTED' || c.status === 'REJECTED' || c.status === 'HIRED');
+  const shortlisted = candidates.filter(c => c.status === 'SHORTLISTED' || c.status === 'HIRED');
+  const latestEvaluated = evaluated[0] || null;
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
@@ -43,9 +44,9 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
         <div className="space-y-1">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-950 border border-cyan-800 text-cyan-400 text-xs font-semibold">
             <Bot className="w-3.5 h-3.5" />
-            {currentCompany?.name || 'Cyberdyne Autonomous Systems'} Workspace
+            {currentCompany?.name || 'Enterprise'} Workspace
           </div>
-          <h1 className="text-2xl font-extrabold text-white">AI Robotics Interview Control Center</h1>
+          <h1 className="text-2xl font-extrabold text-white">AI Interview & Recruitment Dashboard</h1>
           <p className="text-xs text-slate-400 max-w-xl">
             Autonomous talent screening, timestamped interview video analysis, and multi-vector candidate scorecards.
           </p>
@@ -83,8 +84,8 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-3xl font-extrabold text-white">{candidates.length}</span>
-            <span className="text-xs text-emerald-400 flex items-center font-semibold">
-              +4 this week <ArrowUpRight className="w-3 h-3" />
+            <span className="text-xs text-slate-400 flex items-center font-semibold">
+              Pipeline total
             </span>
           </div>
           <p className="text-[11px] text-slate-500">Across all engineering tracks</p>
@@ -99,7 +100,7 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
             <span className="text-3xl font-extrabold text-white">{evaluated.length}</span>
             <span className="text-xs font-mono text-emerald-400">Dossiers</span>
           </div>
-          <p className="text-[11px] text-slate-500">Complete timestamped videos</p>
+          <p className="text-[11px] text-slate-500">Completed interviews</p>
         </div>
 
         <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 shadow-xl space-y-2">
@@ -111,7 +112,7 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
             <span className="text-3xl font-extrabold text-white">{shortlisted.length}</span>
             <span className="text-xs font-mono text-purple-400">Ready</span>
           </div>
-          <p className="text-[11px] text-slate-500">Passed passing score cutoff</p>
+          <p className="text-[11px] text-slate-500">Passed score benchmarks</p>
         </div>
       </div>
 
@@ -132,45 +133,50 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
             </button>
           </div>
 
-          <div className="p-5 rounded-2xl bg-slate-950 border border-cyan-900/40 space-y-4">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-cyan-600 to-indigo-600 flex items-center justify-center font-bold text-white shadow-md">
-                  VS
+          {latestEvaluated ? (
+            <div className="p-5 rounded-2xl bg-slate-950 border border-cyan-900/40 space-y-4">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-cyan-600 to-indigo-600 flex items-center justify-center font-bold text-white shadow-md">
+                    {latestEvaluated.firstName[0]}{latestEvaluated.lastName[0]}
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-white">{latestEvaluated.firstName} {latestEvaluated.lastName}</h3>
+                    <p className="text-xs text-slate-400">{latestEvaluated.email}</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-sm font-bold text-white">Vikram Singh</h3>
-                  <p className="text-xs text-slate-400">Lead Robotics Perception & Kinematics Engineer</p>
+
+                <div className="text-right">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-bold bg-cyan-950 text-cyan-300 border border-cyan-800">
+                    {latestEvaluated.status}
+                  </span>
                 </div>
               </div>
 
-              <div className="text-right">
-                <div className="text-2xl font-extrabold text-cyan-400 font-mono">91/100</div>
-                <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-bold bg-cyan-950 text-cyan-300 border border-cyan-800">
-                  STRONG HIRE
-                </span>
+              <div className="flex items-center justify-between pt-1">
+                <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                  <Clock className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Applied: {new Date(latestEvaluated.appliedAt).toLocaleDateString()}</span>
+                </div>
+
+                <button
+                  onClick={() => onSelectCandidate(latestEvaluated.id)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-white shadow-md transition-all flex items-center gap-1.5"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>Open Scorecard</span>
+                </button>
               </div>
             </div>
-
-            <p className="text-xs text-slate-300 bg-slate-900 p-3 rounded-xl border border-slate-800/80 leading-relaxed">
-              "Demonstrates deep mastery of non-linear robot kinematics, Jacobian singularity management, and Damped Least Squares. Extremely crisp communication at 141 WPM with zero hesitation."
-            </p>
-
-            <div className="flex items-center justify-between pt-1">
-              <div className="flex items-center gap-2 text-[11px] text-slate-400">
-                <Clock className="w-3.5 h-3.5 text-cyan-400" />
-                <span>4 Video Questions • 18m Duration</span>
-              </div>
-
-              <button
-                onClick={() => onSelectCandidate('cand_vikram_singh')}
-                className="px-4 py-2 rounded-xl text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-white shadow-md transition-all flex items-center gap-1.5"
-              >
-                <FileText className="w-3.5 h-3.5" />
-                <span>Open Scorecard & Video</span>
-              </button>
+          ) : (
+            <div className="p-12 text-center bg-slate-950 border border-slate-800/80 rounded-2xl space-y-2">
+              <Inbox className="w-10 h-10 text-slate-600 mx-auto" />
+              <h3 className="text-sm font-bold text-white">No evaluated candidates yet</h3>
+              <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                Invite candidates to take AI proctored interviews to see automated evaluation scorecards here.
+              </p>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Quick Openings */}
@@ -188,22 +194,35 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
             </button>
           </div>
 
-          <div className="space-y-2.5">
-            {jobs.map(j => (
-              <div
-                key={j.id}
-                className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between text-xs hover:border-slate-700 transition-colors"
+          {jobs.length === 0 ? (
+            <div className="p-8 text-center bg-slate-950 border border-slate-800/80 rounded-2xl space-y-2">
+              <Briefcase className="w-8 h-8 text-slate-600 mx-auto" />
+              <div className="text-xs text-slate-400">No active job positions created yet.</div>
+              <button
+                onClick={() => onNavigateTab('jobs')}
+                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold"
               >
-                <div>
-                  <div className="font-bold text-slate-200">{j.title}</div>
-                  <div className="text-[11px] text-slate-400">{j.department} • {j.experienceLevel}</div>
+                Create First Job
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {jobs.map(j => (
+                <div
+                  key={j.id}
+                  className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between text-xs hover:border-slate-700 transition-colors"
+                >
+                  <div>
+                    <div className="font-bold text-slate-200">{j.title}</div>
+                    <div className="text-[11px] text-slate-400">{j.department} • {j.experienceLevel}</div>
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-slate-900 text-slate-400 font-mono">
+                    {j.status}
+                  </span>
                 </div>
-                <span className="text-[10px] px-2 py-0.5 rounded bg-slate-900 text-slate-400 font-mono">
-                  {j.status}
-                </span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

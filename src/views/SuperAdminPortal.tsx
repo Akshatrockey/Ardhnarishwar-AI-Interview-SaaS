@@ -17,6 +17,8 @@ import { GlobalAuditLogs } from '../components/super-admin/GlobalAuditLogs';
 import { GlobalQuestionBankManager } from '../components/super-admin/GlobalQuestionBankManager';
 import { SubscriptionPlansManager } from '../components/super-admin/SubscriptionPlansManager';
 
+import { ResumeManagementPanel } from '../components/super-admin/ResumeManagementPanel';
+
 // Enterprise Cross-Module Views
 import { ResumeShortlistPanel } from '../components/company-admin/ResumeShortlistPanel';
 import { InterviewResultsPanel } from '../components/company-admin/InterviewResultsPanel';
@@ -144,6 +146,7 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({
 
   const navItems = [
     { id: 'dashboard', label: 'Platform Telemetry', icon: LayoutDashboard },
+    { id: 'resume_vault', label: 'Resume Management Vault', icon: FileText, badge: 'Storage' },
     { id: 'live_control_center', label: 'Live Control Center', icon: Radio, badge: 'Realtime' },
     { id: 'ai_training', label: 'AI Training Studio', icon: Cpu, badge: 'Tuning' },
     { id: 'questions', label: 'Global Question Bank', icon: Database, badge: `${totalQuestions}` },
@@ -171,6 +174,8 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({
     switch (activeTab) {
       case 'dashboard':
         return <OverviewDashboard onNavigateTab={setActiveTab} />;
+      case 'resume_vault':
+        return <ResumeManagementPanel />;
       case 'live_control_center':
         return (
           <SuperAdminLiveControlCenter

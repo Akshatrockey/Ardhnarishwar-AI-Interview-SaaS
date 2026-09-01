@@ -53,3 +53,12 @@ htmlcov/
 
 # Local Netlify folder
 .netlify
+*.zip
+*.exe
+tools/*.exe
+backend/storage/resumes/*
+!backend/storage/resumes/.gitkeep
+backend/storage/recordings/*
+!backend/storage/recordings/.gitkeep
+
+

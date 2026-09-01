@@ -55,6 +55,7 @@ export interface User {
 
 export type JobStatus = 'OPEN' | 'CLOSED' | 'DRAFT';
 export type ExperienceLevel = 'ENTRY' | 'MID' | 'SENIOR' | 'LEAD' | 'PRINCIPAL';
+export type SkillCategory = 'SKILLED' | 'UNSKILLED' | 'SEMI_SKILLED';
 
 export interface JobPosition {
   id: string;
@@ -64,6 +65,7 @@ export interface JobPosition {
   location: string;
   type: 'FULL_TIME' | 'CONTRACT' | 'REMOTE' | 'HYBRID';
   experienceLevel: ExperienceLevel;
+  skillCategory?: SkillCategory;
   description: string;
   requiredSkills: string[];
   status: JobStatus;
@@ -76,6 +78,8 @@ export type RoundType =
   | 'AI_SCREENING'
   | 'TECHNICAL_ROBOTICS'
   | 'SOFTWARE_SYSTEMS'
+  | 'PRACTICAL_OPERATIONS'
+  | 'GENERAL_APTITUDE'
   | 'HR_BEHAVIORAL'
   | 'LEADERSHIP_PROBLEM_SOLVING';
 
@@ -98,6 +102,8 @@ export type QuestionCategory =
   | 'HR'
   | 'BEHAVIORAL'
   | 'PROBLEM_SOLVING'
+  | 'PRACTICAL_SAFETY'
+  | 'OPERATIONAL_WORKFLOW'
   | 'ROBOTICS_HARDWARE'
   | 'CONTROL_SYSTEMS'
   | 'EMBEDDED_C_CPP';
@@ -124,8 +130,9 @@ export type EvaluationGrade =
 export interface Question {
   id: string;
   category: QuestionCategory;
-  roleCategory: string; // e.g. "Robotics Engineer", "AI/ML", "ROS2 Developer"
-  questionType?: string; // 'TECHNICAL' | 'BEHAVIORAL' | 'CONCEPTUAL' | 'CODING' | 'SYSTEM_DESIGN' | 'HR'
+  roleCategory: string; // e.g. "Robotics Engineer", "Assembly Line Operator", "Warehouse Logistics"
+  questionType?: string; // 'TECHNICAL' | 'BEHAVIORAL' | 'CONCEPTUAL' | 'CODING' | 'SYSTEM_DESIGN' | 'PRACTICAL' | 'HR'
+  targetSkillLevel?: SkillCategory | 'ALL';
   difficulty: DifficultyLevel;
   title: string;
   prompt: string;
@@ -159,6 +166,7 @@ export interface Candidate {
   lastName: string;
   email: string;
   phone: string;
+  skillCategory?: SkillCategory;
   currentTitle?: string;
   yearsOfExperience: number;
   status: CandidateStatus;

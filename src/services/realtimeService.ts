@@ -71,9 +71,7 @@ class RealtimeClientService {
       url = `${cleanWsUrl}/ws/realtime/${this.currentUserRole}/${this.currentUserId}?company_id=${this.currentCompanyId}`;
     } else {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      // Use backend port 8000 by default or current host if proxied
-      const isViteDev = window.location.port === '5173' || window.location.port === '3000';
-      const wsHost = isViteDev ? 'localhost:8000' : window.location.host;
+      const wsHost = window.location.host;
       url = `${protocol}//${wsHost}/ws/realtime/${this.currentUserRole}/${this.currentUserId}?company_id=${this.currentCompanyId}`;
     }
     

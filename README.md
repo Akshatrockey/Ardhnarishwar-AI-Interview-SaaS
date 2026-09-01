@@ -1,48 +1,94 @@
-# 🤖 Ardhnarishwar Global AI Robotics Interview SaaS Platform
+# 🤖 Ardhnarishwar AI SaaS — 100% Real-Time Production Platform
 
-An enterprise-grade, multi-tenant B2B SaaS platform for automated, AI-driven candidate technical and behavioral interviewing. Built for autonomous systems, robotics, control theory, and high-performance software engineering hiring.
-
----
-
-## 🌟 Core Platform Highlights
-
-- **👑 Ardhnarishwar Super Admin Control Center**: Multi-tenant company provisioning, global candidate telemetry, AI hyperparameter tuning, model version registry, and immutable audit logging.
-- **🏢 Company Admin & Recruiter Workspace**: Multi-stage interview round setup (AI Screening, Technical Robotics, Behavioral STAR), job position manager, and real-time candidate pipeline tracking.
-- **🎙️ Candidate Live Interview Chamber**: Hardware pre-flight diagnostics (1080p camera check + Web Audio API VU-meter), animated robotic interviewer avatar, speech-to-text transcription, and WebRTC timestamped video recording.
-- **🧠 Internally Controlled Core-AI Engine**: Strictly zero reliance on third-party generative AI APIs (no OpenAI, Gemini, Claude, or Grok). Evaluates responses using Scikit-Learn TF-IDF cosine similarity, domain concept graph matching, speech fluency/WPM pacing, and STAR behavioral heuristics.
-- **🗄️ MySQL 8.0 & SQLAlchemy 2.0 ORM**: Connection pooling (`pool_size=20`, `pool_recycle=1800`), cascading foreign keys across 13 relational tables, and eager-loaded joined queries.
-- **🔐 Zero-Trust Cryptographic Security**: HMAC-SHA256 JWT Bearer authentication, anti-header-spoofing defense guards, active sliding-window rate limiting, and authorized Super Admin impersonation.
+An enterprise-grade, multi-tenant B2B AI Interview & HRMS SaaS platform. Features autonomous AI candidate evaluations, live video recording, resume management vault, and support for both **Skilled Technical Candidates** and **Unskilled / General Workforce Applicants**.
 
 ---
 
-## 🛠️ Technology Stack
+## ⚡ 1-Click Fast Launchers (Zero Setup)
 
-- **Frontend**: React 18, TypeScript, Tailwind CSS, Lucide Icons, WebRTC, Web Audio API, Web Speech API
-- **Backend**: Python 3.11/3.14, FastAPI, SQLAlchemy 2.0, PyMySQL, Pydantic v2, PyJWT, Alembic, Scikit-Learn, NumPy, Pandas
-- **Database**: MySQL 8.0 with InnoDB Engine & Connection Pooling
-- **Storage**: Tenant-isolated file vaults with 15-minute HMAC-SHA256 presigned streaming tokens
-- **DevOps**: Docker, Docker Compose, Nginx Reverse Proxy
+| Script | Purpose |
+|---|---|
+| 🚀 **`START_APPLICATION.bat`** | **Single 1-Click Launcher**: Starts FastAPI backend (`8000`), Vite frontend (`5173`), opens your browser, and creates a shareable public HTTPS tunnel link. |
+| 🌐 **`run_public_url.bat`** | Launches the full-stack app with an instant global HTTPS tunnel via `localtunnel`. |
+| ☁️ **`sync_and_deploy.bat`** | Verifies builds, auto-stages changes, commits, and pushes to GitHub to trigger Vercel/Netlify/Render auto-deployment. |
 
 ---
 
-## 🧪 Verification Commands
+## 🌟 Core Features & Modules
+
+### 1. 🛠️ Skilled vs. 👷 Unskilled / General Workforce System
+- **Skilled Professionals** (Robotics, AI, Software, Systems, Management):
+  - In-depth technical assessments (ROS2, SLAM, Python, C++, Kinematics).
+  - Code syntax checking, domain concept graph matching, STAR behavioral heuristics.
+- **Unskilled & General Workforce** (Assembly Operators, Logistics, Helpers, Trainees):
+  - Streamlined application (Name, Phone, Trade/Experience).
+  - Practical aptitude, workplace safety protocols, teamwork reliability, and verbal clarity evaluations without unfair technical algorithm penalties.
+- **Recruiter & Job Management**:
+  - Filter and tag jobs and candidates by skill category (`SKILLED`, `UNSKILLED`, `SEMI_SKILLED`).
+
+### 2. 📄 Production Resume Vault
+- Multipart file upload (PDF, DOC, DOCX up to 10MB) with cryptographic storage.
+- Auto-linked to candidate applications, company tenants, and interview dossiers.
+- Dedicated Super Admin & Candidate management interfaces with streaming download and deletion.
+
+### 3. 🧠 In-House Core-AI Evaluation Engine
+- **Zero reliance on third-party paid APIs** (No OpenAI, Gemini, or Claude dependencies).
+- TF-IDF vectorizer + concept graph evaluator + speech fluency WPM calculator.
+- Deterministic SHA-256 reproducibility hashes for compliance and auditability.
+
+### 4. 👑 Super Admin & Company Admin Workspaces
+- Super Admin console for multi-tenant company provisioning, resume vault audit, and AI hyperparameter tuning.
+- Recruiter workspaces with interview round builders, candidate pipeline boards, and automated scorecard generation.
+
+---
+
+## 🚀 Quick Start (Manual)
+
+### Backend (FastAPI):
+```bash
+cd backend
+python -m venv .venv
+.venv\Scripts\activate      # Windows (.venv/bin/activate on Linux/macOS)
+pip install -r requirements.txt
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+```
+API Documentation: `http://localhost:8000/docs`
+
+### Frontend (React + Vite + TypeScript):
+```bash
+npm install
+npm run dev
+```
+Access Frontend: `http://localhost:5173`
+
+---
+
+## 🧪 Automated Test Suite
 
 ```bash
-# 1. Production Frontend Build
+# 1. Frontend Build & TypeScript Typecheck
 npm run build
 
-# 2. AI Model Versioning & Historical Reproducibility Test
-npx tsx test_ai_versioning_reproducibility.ts
+# 2. End-to-End Production Flow Integration Test
+backend\.venv\Scripts\python.exe backend/test_e2e_production_flow.py
 
-# 3. Zero-Trust JWT & Actor Header Penetration Test
-backend\.venv\Scripts\python.exe backend\test_jwt_security_attacks.py
+# 3. Skilled vs. Unskilled Pipeline Test
+backend\.venv\Scripts\python.exe backend/test_skilled_unskilled_flow.py
 
-# 4. Multi-Tenant Cross-Tenant Penetration Test
-backend\.venv\Scripts\python.exe backend\audit_cross_tenant_deep.py
-
-# 5. Recording Lifecycle & Presigned Streaming Security Test
-backend\.venv\Scripts\python.exe backend\test_recording_lifecycle.py
-
-# 6. Live SQLAlchemy ORM Runtime Test
-backend\.venv\Scripts\python.exe backend\test_sqlalchemy_live.py
+# 4. Zero-Trust Security & JWT Attack Test
+backend\.venv\Scripts\python.exe backend/test_jwt_security_attacks.py
 ```
+
+---
+
+## 🌐 Production Deployment Guides
+
+### Docker & Docker Compose
+```bash
+docker compose up --build -d
+```
+
+### Vercel / Netlify / Render
+- **Frontend**: Connect repository to Vercel or Netlify with root build command `npm run build` and output `dist`.
+- **Backend**: Deploy `backend/` directory to Render / Railway / Fly.io using `render.yaml` or `Procfile`.
+- **Set Environment Variables**: Set `VITE_API_URL` on frontend to point to your live backend domain.

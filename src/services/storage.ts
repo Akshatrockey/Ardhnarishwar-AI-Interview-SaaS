@@ -1,6 +1,5 @@
-// Persistent Client-Side Data Store & IndexedDB Video Chunk Manager
+// Persistent Client-Side Data Store & IndexedDB Video Chunk Manager (Production Real-Time)
 import { Company, User, JobPosition, InterviewRound, Question, Candidate, InterviewSession, AuditLog, SubscriptionPlan, AIEngineHyperparams } from '../types';
-import { INITIAL_COMPANIES, INITIAL_USERS, INITIAL_JOBS, INITIAL_ROUNDS, ALL_INITIAL_QUESTIONS, INITIAL_CANDIDATES, INITIAL_SESSIONS, INITIAL_AUDIT_LOGS, SUBSCRIPTION_PLANS } from '../ai-engine/datasets/seedData';
 import { DEFAULT_AI_HYPERPARAMS } from '../ai-engine/scoringPipeline';
 
 const STORAGE_KEYS = {
@@ -23,6 +22,9 @@ const IDB_STORE = 'video_recordings';
 
 function openVideoDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
+    if (typeof indexedDB === 'undefined') {
+      return reject(new Error('IndexedDB not supported'));
+    }
     const request = indexedDB.open(IDB_NAME, IDB_VERSION);
     request.onupgradeneeded = () => {
       const db = request.result;
@@ -70,15 +72,14 @@ export async function getVideoBlob(sessionId: string): Promise<Blob | null> {
 
 const memoryStore = new Map<string, string>();
 
-// LocalStorage helpers with automatic seeding
 function getStored<T>(key: string, defaultVal: T): T {
   try {
     if (typeof window !== 'undefined' && window.localStorage) {
       const item = localStorage.getItem(key);
-      return item ? JSON.parse(item) : defaultVal;
+      return item !== null ? JSON.parse(item) : defaultVal;
     }
     const item = memoryStore.get(key);
-    return item ? JSON.parse(item) : defaultVal;
+    return item !== undefined ? JSON.parse(item) : defaultVal;
   } catch {
     return defaultVal;
   }
@@ -98,43 +99,40 @@ function setStored<T>(key: string, val: T): void {
 }
 
 export class AppDataStore {
-  // Initialize and ensure seed data is present
+  // Initialize clean production state with ZERO demo records
   static init(): void {
-    if (!getStored(STORAGE_KEYS.COMPANIES, null)) {
-      setStored(STORAGE_KEYS.COMPANIES, INITIAL_COMPANIES);
+    if (getStored(STORAGE_KEYS.COMPANIES, null) === null) {
+      setStored(STORAGE_KEYS.COMPANIES, []);
     }
-    if (!getStored(STORAGE_KEYS.USERS, null)) {
-      setStored(STORAGE_KEYS.USERS, INITIAL_USERS);
+    if (getStored(STORAGE_KEYS.USERS, null) === null) {
+      setStored(STORAGE_KEYS.USERS, []);
     }
-    if (!getStored(STORAGE_KEYS.JOBS, null)) {
-      setStored(STORAGE_KEYS.JOBS, INITIAL_JOBS);
+    if (getStored(STORAGE_KEYS.JOBS, null) === null) {
+      setStored(STORAGE_KEYS.JOBS, []);
     }
-    if (!getStored(STORAGE_KEYS.ROUNDS, null)) {
-      setStored(STORAGE_KEYS.ROUNDS, INITIAL_ROUNDS);
+    if (getStored(STORAGE_KEYS.ROUNDS, null) === null) {
+      setStored(STORAGE_KEYS.ROUNDS, []);
     }
-    if (!getStored(STORAGE_KEYS.QUESTIONS, null)) {
-      setStored(STORAGE_KEYS.QUESTIONS, ALL_INITIAL_QUESTIONS);
+    if (getStored(STORAGE_KEYS.QUESTIONS, null) === null) {
+      setStored(STORAGE_KEYS.QUESTIONS, []);
     }
-    if (!getStored(STORAGE_KEYS.CANDIDATES, null)) {
-      setStored(STORAGE_KEYS.CANDIDATES, INITIAL_CANDIDATES);
+    if (getStored(STORAGE_KEYS.CANDIDATES, null) === null) {
+      setStored(STORAGE_KEYS.CANDIDATES, []);
     }
-    if (!getStored(STORAGE_KEYS.SESSIONS, null)) {
-      setStored(STORAGE_KEYS.SESSIONS, INITIAL_SESSIONS);
+    if (getStored(STORAGE_KEYS.SESSIONS, null) === null) {
+      setStored(STORAGE_KEYS.SESSIONS, []);
     }
-    if (!getStored(STORAGE_KEYS.AUDIT_LOGS, null)) {
-      setStored(STORAGE_KEYS.AUDIT_LOGS, INITIAL_AUDIT_LOGS);
+    if (getStored(STORAGE_KEYS.AUDIT_LOGS, null) === null) {
+      setStored(STORAGE_KEYS.AUDIT_LOGS, []);
     }
-    if (!getStored(STORAGE_KEYS.PLANS, null)) {
-      setStored(STORAGE_KEYS.PLANS, SUBSCRIPTION_PLANS);
-    }
-    if (!getStored(STORAGE_KEYS.HYPERPARAMS, null)) {
+    if (getStored(STORAGE_KEYS.HYPERPARAMS, null) === null) {
       setStored(STORAGE_KEYS.HYPERPARAMS, DEFAULT_AI_HYPERPARAMS);
     }
   }
 
   // Companies
   static getCompanies(): Company[] {
-    return getStored<Company[]>(STORAGE_KEYS.COMPANIES, INITIAL_COMPANIES);
+    return getStored<Company[]>(STORAGE_KEYS.COMPANIES, []);
   }
   static saveCompanies(companies: Company[]): void {
     setStored(STORAGE_KEYS.COMPANIES, companies);
@@ -142,7 +140,7 @@ export class AppDataStore {
 
   // Users
   static getUsers(): User[] {
-    return getStored<User[]>(STORAGE_KEYS.USERS, INITIAL_USERS);
+    return getStored<User[]>(STORAGE_KEYS.USERS, []);
   }
   static saveUsers(users: User[]): void {
     setStored(STORAGE_KEYS.USERS, users);
@@ -150,7 +148,7 @@ export class AppDataStore {
 
   // Jobs
   static getJobs(): JobPosition[] {
-    return getStored<JobPosition[]>(STORAGE_KEYS.JOBS, INITIAL_JOBS);
+    return getStored<JobPosition[]>(STORAGE_KEYS.JOBS, []);
   }
   static saveJobs(jobs: JobPosition[]): void {
     setStored(STORAGE_KEYS.JOBS, jobs);
@@ -158,7 +156,7 @@ export class AppDataStore {
 
   // Rounds
   static getRounds(): InterviewRound[] {
-    return getStored<InterviewRound[]>(STORAGE_KEYS.ROUNDS, INITIAL_ROUNDS);
+    return getStored<InterviewRound[]>(STORAGE_KEYS.ROUNDS, []);
   }
   static saveRounds(rounds: InterviewRound[]): void {
     setStored(STORAGE_KEYS.ROUNDS, rounds);
@@ -166,22 +164,7 @@ export class AppDataStore {
 
   // Questions
   static getQuestions(): Question[] {
-    const raw = getStored<Question[]>(STORAGE_KEYS.QUESTIONS, ALL_INITIAL_QUESTIONS);
-    // Automatic migration & normalization to guarantee expectedAnswer, criteria, and maxScore
-    return raw.map(q => ({
-      ...q,
-      expectedAnswer: q.expectedAnswer || q.idealBenchmarkAnswer || 'Standard benchmark answer defined by administrator.',
-      idealBenchmarkAnswer: q.idealBenchmarkAnswer || q.expectedAnswer || 'Standard benchmark answer defined by administrator.',
-      evaluationCriteria: (q.evaluationCriteria && q.evaluationCriteria.length > 0)
-        ? q.evaluationCriteria
-        : [
-            `Demonstrates fundamental understanding of ${q.title}`,
-            `Explains core concepts accurately: ${q.keyConcepts.slice(0, 3).join(', ')}`,
-            'Provides structured, logical technical reasoning'
-          ],
-      maxScore: q.maxScore || 10,
-      questionType: q.questionType || (q.category === 'BEHAVIORAL' || q.category === 'HR' ? 'BEHAVIORAL' : 'TECHNICAL'),
-    }));
+    return getStored<Question[]>(STORAGE_KEYS.QUESTIONS, []);
   }
   static saveQuestions(questions: Question[]): void {
     setStored(STORAGE_KEYS.QUESTIONS, questions);
@@ -199,7 +182,7 @@ export class AppDataStore {
 
   // Candidates
   static getCandidates(): Candidate[] {
-    return getStored<Candidate[]>(STORAGE_KEYS.CANDIDATES, INITIAL_CANDIDATES);
+    return getStored<Candidate[]>(STORAGE_KEYS.CANDIDATES, []);
   }
   static saveCandidates(candidates: Candidate[]): void {
     setStored(STORAGE_KEYS.CANDIDATES, candidates);
@@ -207,7 +190,7 @@ export class AppDataStore {
 
   // Sessions
   static getSessions(): InterviewSession[] {
-    return getStored<InterviewSession[]>(STORAGE_KEYS.SESSIONS, INITIAL_SESSIONS);
+    return getStored<InterviewSession[]>(STORAGE_KEYS.SESSIONS, []);
   }
   static saveSessions(sessions: InterviewSession[]): void {
     setStored(STORAGE_KEYS.SESSIONS, sessions);
@@ -215,7 +198,7 @@ export class AppDataStore {
 
   // Audit Logs
   static getAuditLogs(): AuditLog[] {
-    return getStored<AuditLog[]>(STORAGE_KEYS.AUDIT_LOGS, INITIAL_AUDIT_LOGS);
+    return getStored<AuditLog[]>(STORAGE_KEYS.AUDIT_LOGS, []);
   }
   static logActivity(log: Omit<AuditLog, 'id' | 'timestamp'>): void {
     const logs = this.getAuditLogs();
@@ -237,7 +220,15 @@ export class AppDataStore {
 
   // Reset storage to enterprise defaults
   static resetToDefault(): void {
-    localStorage.clear();
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(STORAGE_KEYS.COMPANIES);
+      localStorage.removeItem(STORAGE_KEYS.JOBS);
+      localStorage.removeItem(STORAGE_KEYS.ROUNDS);
+      localStorage.removeItem(STORAGE_KEYS.QUESTIONS);
+      localStorage.removeItem(STORAGE_KEYS.CANDIDATES);
+      localStorage.removeItem(STORAGE_KEYS.SESSIONS);
+      localStorage.removeItem(STORAGE_KEYS.AUDIT_LOGS);
+    }
     this.init();
   }
 }

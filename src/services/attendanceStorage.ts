@@ -19,294 +19,12 @@ const ATTENDANCE_KEYS = {
   RECORDS: 'ardhnarishwar_attendance_records_v1',
 };
 
-// Seed Data for Attendance
-export const INITIAL_DEPARTMENTS: Department[] = [
-  {
-    id: 'dept_perception',
-    companyId: 'comp_cyberdyne',
-    name: 'Autonomous Perception & SLAM',
-    code: 'PERCEPT-01',
-    totalEmployees: 12,
-    headUserName: 'Dr. Miles Bennett',
-    createdAt: '2026-01-10T10:00:00.000Z',
-  },
-  {
-    id: 'dept_embedded',
-    companyId: 'comp_cyberdyne',
-    name: 'Embedded Real-Time Systems',
-    code: 'EMBED-02',
-    totalEmployees: 8,
-    headUserName: 'Marcus Thorne',
-    createdAt: '2026-01-10T10:00:00.000Z',
-  },
-  {
-    id: 'dept_fleet',
-    companyId: 'comp_cyberdyne',
-    name: 'Fleet Operations & AGV Control',
-    code: 'FLEET-03',
-    totalEmployees: 15,
-    headUserName: 'Sarah Connor',
-    createdAt: '2026-01-10T10:00:00.000Z',
-  },
-  {
-    id: 'dept_hr',
-    companyId: 'comp_cyberdyne',
-    name: 'People Operations & Talent',
-    code: 'PEOPLE-04',
-    totalEmployees: 4,
-    headUserName: 'Elena Rostova',
-    createdAt: '2026-01-10T10:00:00.000Z',
-  }
-];
-
-export const INITIAL_LOCATIONS: WorkLocation[] = [
-  {
-    id: 'loc_sf_hq',
-    companyId: 'comp_cyberdyne',
-    name: 'Cyberdyne Global R&D Headquarters',
-    address: '400 Howard Street, San Francisco, CA 94105',
-    latitude: 37.789172,
-    longitude: -122.396821,
-    geofenceRadiusMeters: 200,
-    authorizedWifiSsids: ['Cyberdyne_Corp_5G', 'Cyberdyne_Robotics_Secure', 'Cyberdyne_Guest'],
-    authorizedIpRanges: ['198.51.100.0/24', '10.20.0.0/16'],
-    isActive: true,
-    createdAt: '2026-01-10T10:00:00.000Z',
-  },
-  {
-    id: 'loc_boston_lab',
-    companyId: 'comp_cyberdyne',
-    name: 'Boston Mechatronics & Dynamics Lab',
-    address: '77 Massachusetts Ave, Cambridge, MA 02139',
-    latitude: 42.359244,
-    longitude: -71.093165,
-    geofenceRadiusMeters: 150,
-    authorizedWifiSsids: ['BostonBio_Robotics_5G', 'Mechatronics_Lab'],
-    isActive: true,
-    createdAt: '2026-01-15T10:00:00.000Z',
-  }
-];
-
-export const INITIAL_SHIFTS: Shift[] = [
-  {
-    id: 'shift_morning_std',
-    companyId: 'comp_cyberdyne',
-    name: 'Standard Morning Shift (9 AM - 6 PM)',
-    startTime: '09:00',
-    endTime: '18:00',
-    gracePeriodMinutes: 15,
-    halfDayThresholdHours: 4.5,
-    fullDayThresholdHours: 8.0,
-    isFlexible: false,
-    createdAt: '2026-01-10T10:00:00.000Z',
-  },
-  {
-    id: 'shift_evening_r_d',
-    companyId: 'comp_cyberdyne',
-    name: 'Robotics R&D High-Power Shift (1 PM - 10 PM)',
-    startTime: '13:00',
-    endTime: '22:00',
-    gracePeriodMinutes: 20,
-    halfDayThresholdHours: 4.5,
-    fullDayThresholdHours: 8.0,
-    isFlexible: false,
-    createdAt: '2026-01-10T10:00:00.000Z',
-  },
-  {
-    id: 'shift_flexible',
-    companyId: 'comp_cyberdyne',
-    name: 'Flexible Core Hours (Any 8.5 Hours)',
-    startTime: '08:00',
-    endTime: '20:00',
-    gracePeriodMinutes: 60,
-    halfDayThresholdHours: 4.0,
-    fullDayThresholdHours: 8.0,
-    isFlexible: true,
-    createdAt: '2026-01-10T10:00:00.000Z',
-  }
-];
-
-export const INITIAL_EMPLOYEES: Employee[] = [
-  {
-    id: 'emp_01',
-    companyId: 'comp_cyberdyne',
-    departmentId: 'dept_perception',
-    locationId: 'loc_sf_hq',
-    shiftId: 'shift_morning_std',
-    employeeCode: 'CYBER-101',
-    firstName: 'Vikram',
-    lastName: 'Singh',
-    email: 'vikram.singh@cyberdyne.io',
-    phone: '+1 (415) 892-3490',
-    designation: 'Lead Robotics Perception Engineer',
-    joiningDate: '2026-02-01',
-    status: 'ACTIVE',
-    faceBiometricRegistered: true,
-    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
-  },
-  {
-    id: 'emp_02',
-    companyId: 'comp_cyberdyne',
-    departmentId: 'dept_perception',
-    locationId: 'loc_sf_hq',
-    shiftId: 'shift_morning_std',
-    employeeCode: 'CYBER-102',
-    firstName: 'Alyssa',
-    lastName: 'Vance',
-    email: 'alyssa.vance@cyberdyne.io',
-    phone: '+1 (617) 554-9021',
-    designation: 'Autonomous Navigation Specialist',
-    joiningDate: '2026-01-15',
-    status: 'ACTIVE',
-    faceBiometricRegistered: true,
-    avatarUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=100&auto=format&fit=crop&q=80',
-  },
-  {
-    id: 'emp_03',
-    companyId: 'comp_cyberdyne',
-    departmentId: 'dept_embedded',
-    locationId: 'loc_sf_hq',
-    shiftId: 'shift_morning_std',
-    employeeCode: 'CYBER-103',
-    firstName: 'Marcus',
-    lastName: 'Thorne',
-    email: 'marcus.thorne@cyberdyne.io',
-    phone: '+1 (206) 433-8812',
-    designation: 'Senior Real-Time C++ Architect',
-    joiningDate: '2026-01-20',
-    status: 'ACTIVE',
-    faceBiometricRegistered: true,
-    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
-  },
-  {
-    id: 'emp_04',
-    companyId: 'comp_cyberdyne',
-    departmentId: 'dept_fleet',
-    locationId: 'loc_sf_hq',
-    shiftId: 'shift_evening_r_d',
-    employeeCode: 'CYBER-104',
-    firstName: 'Priya',
-    lastName: 'Sharma',
-    email: 'priya.sharma@cyberdyne.io',
-    phone: '+1 (408) 723-9901',
-    designation: 'AGV Fleet Systems Lead',
-    joiningDate: '2026-02-10',
-    status: 'ACTIVE',
-    faceBiometricRegistered: false,
-    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=100&auto=format&fit=crop&q=80',
-  },
-  {
-    id: 'emp_05',
-    companyId: 'comp_cyberdyne',
-    departmentId: 'dept_hr',
-    locationId: 'loc_sf_hq',
-    shiftId: 'shift_morning_std',
-    employeeCode: 'CYBER-105',
-    firstName: 'Sarah',
-    lastName: 'Connor',
-    email: 'sarah.connor@cyberdyne.io',
-    phone: '+1 (415) 555-0182',
-    designation: 'Principal Talent Partner',
-    joiningDate: '2026-01-12',
-    status: 'ACTIVE',
-    faceBiometricRegistered: true,
-    avatarUrl: 'https://images.unsplash.com/photo-1531746790731-6c087fecd65a?w=100&auto=format&fit=crop&q=80',
-  }
-];
-
-export const INITIAL_ATTENDANCE_RECORDS: AttendanceRecord[] = [
-  {
-    id: 'att_01',
-    companyId: 'comp_cyberdyne',
-    employeeId: 'emp_01',
-    departmentId: 'dept_perception',
-    shiftId: 'shift_morning_std',
-    attendanceDate: '2026-08-28',
-    punchInTime: '2026-08-28T09:04:15.000Z',
-    punchInMethod: 'CAMERA_FACIAL',
-    punchInLocationId: 'loc_sf_hq',
-    punchInLat: 37.789170,
-    punchInLng: -122.396820,
-    punchInDeviceInfo: 'Chrome 122.0 / macOS (Verified Facial Match)',
-    punchOutTime: '2026-08-28T18:10:00.000Z',
-    punchOutMethod: 'CAMERA_FACIAL',
-    totalWorkMinutes: 546,
-    status: 'PRESENT',
-    isLate: false,
-    lateByMinutes: 0,
-    isEarlyLeaving: false,
-    earlyByMinutes: 0,
-    overtimeMinutes: 10,
-    createdAt: '2026-08-28T09:04:15.000Z',
-  },
-  {
-    id: 'att_02',
-    companyId: 'comp_cyberdyne',
-    employeeId: 'emp_02',
-    departmentId: 'dept_perception',
-    shiftId: 'shift_morning_std',
-    attendanceDate: '2026-08-28',
-    punchInTime: '2026-08-28T09:22:00.000Z',
-    punchInMethod: 'GEOFENCE_WIFI',
-    punchInLocationId: 'loc_sf_hq',
-    punchInLat: 37.789200,
-    punchInLng: -122.396800,
-    punchInDeviceInfo: 'SSID: Cyberdyne_Corp_5G (Geofence: 24m from Center)',
-    punchOutTime: undefined,
-    totalWorkMinutes: 0,
-    status: 'LATE',
-    isLate: true,
-    lateByMinutes: 7, // 9:22 - (9:00 + 15m grace)
-    isEarlyLeaving: false,
-    earlyByMinutes: 0,
-    overtimeMinutes: 0,
-    createdAt: '2026-08-28T09:22:00.000Z',
-  },
-  {
-    id: 'att_03',
-    companyId: 'comp_cyberdyne',
-    employeeId: 'emp_03',
-    departmentId: 'dept_embedded',
-    shiftId: 'shift_morning_std',
-    attendanceDate: '2026-08-28',
-    punchInTime: '2026-08-28T08:58:30.000Z',
-    punchInMethod: 'DYNAMIC_OTP',
-    punchInLocationId: 'loc_sf_hq',
-    punchInDeviceInfo: 'Dynamic OTP: 849201 (Verified Room Terminal)',
-    punchOutTime: undefined,
-    totalWorkMinutes: 0,
-    status: 'PRESENT',
-    isLate: false,
-    lateByMinutes: 0,
-    isEarlyLeaving: false,
-    earlyByMinutes: 0,
-    overtimeMinutes: 0,
-    createdAt: '2026-08-28T08:58:30.000Z',
-  },
-  {
-    id: 'att_04',
-    companyId: 'comp_cyberdyne',
-    employeeId: 'emp_05',
-    departmentId: 'dept_hr',
-    shiftId: 'shift_morning_std',
-    attendanceDate: '2026-08-28',
-    punchInTime: '2026-08-28T09:02:10.000Z',
-    punchInMethod: 'CAMERA_FACIAL',
-    punchInLocationId: 'loc_sf_hq',
-    punchInLat: 37.789172,
-    punchInLng: -122.396821,
-    punchInDeviceInfo: 'Chrome / Windows (Face Biometric Match 99.4%)',
-    punchOutTime: undefined,
-    totalWorkMinutes: 0,
-    status: 'PRESENT',
-    isLate: false,
-    lateByMinutes: 0,
-    isEarlyLeaving: false,
-    earlyByMinutes: 0,
-    overtimeMinutes: 0,
-    createdAt: '2026-08-28T09:02:10.000Z',
-  }
-];
+// Clean Production Defaults for Attendance (ZERO demo data)
+export const INITIAL_DEPARTMENTS: Department[] = [];
+export const INITIAL_LOCATIONS: WorkLocation[] = [];
+export const INITIAL_SHIFTS: Shift[] = [];
+export const INITIAL_EMPLOYEES: Employee[] = [];
+export const INITIAL_ATTENDANCE_RECORDS: AttendanceRecord[] = [];
 
 const memoryStore = new Map<string, string>();
 
@@ -338,25 +56,25 @@ function setStored<T>(key: string, val: T): void {
 
 export class AttendanceDataStore {
   static init(): void {
-    if (!getStored(ATTENDANCE_KEYS.DEPARTMENTS, null)) {
-      setStored(ATTENDANCE_KEYS.DEPARTMENTS, INITIAL_DEPARTMENTS);
+    if (getStored(ATTENDANCE_KEYS.DEPARTMENTS, null) === null) {
+      setStored(ATTENDANCE_KEYS.DEPARTMENTS, []);
     }
-    if (!getStored(ATTENDANCE_KEYS.LOCATIONS, null)) {
-      setStored(ATTENDANCE_KEYS.LOCATIONS, INITIAL_LOCATIONS);
+    if (getStored(ATTENDANCE_KEYS.LOCATIONS, null) === null) {
+      setStored(ATTENDANCE_KEYS.LOCATIONS, []);
     }
-    if (!getStored(ATTENDANCE_KEYS.SHIFTS, null)) {
-      setStored(ATTENDANCE_KEYS.SHIFTS, INITIAL_SHIFTS);
+    if (getStored(ATTENDANCE_KEYS.SHIFTS, null) === null) {
+      setStored(ATTENDANCE_KEYS.SHIFTS, []);
     }
-    if (!getStored(ATTENDANCE_KEYS.EMPLOYEES, null)) {
-      setStored(ATTENDANCE_KEYS.EMPLOYEES, INITIAL_EMPLOYEES);
+    if (getStored(ATTENDANCE_KEYS.EMPLOYEES, null) === null) {
+      setStored(ATTENDANCE_KEYS.EMPLOYEES, []);
     }
-    if (!getStored(ATTENDANCE_KEYS.RECORDS, null)) {
-      setStored(ATTENDANCE_KEYS.RECORDS, INITIAL_ATTENDANCE_RECORDS);
+    if (getStored(ATTENDANCE_KEYS.RECORDS, null) === null) {
+      setStored(ATTENDANCE_KEYS.RECORDS, []);
     }
   }
 
   static getDepartments(companyId?: string): Department[] {
-    const all = getStored<Department[]>(ATTENDANCE_KEYS.DEPARTMENTS, INITIAL_DEPARTMENTS);
+    const all = getStored<Department[]>(ATTENDANCE_KEYS.DEPARTMENTS, []);
     return companyId && companyId !== 'comp_ardhnarishwar' ? all.filter(d => d.companyId === companyId) : all;
   }
   static saveDepartments(depts: Department[]): void {
@@ -364,7 +82,7 @@ export class AttendanceDataStore {
   }
 
   static getLocations(companyId?: string): WorkLocation[] {
-    const all = getStored<WorkLocation[]>(ATTENDANCE_KEYS.LOCATIONS, INITIAL_LOCATIONS);
+    const all = getStored<WorkLocation[]>(ATTENDANCE_KEYS.LOCATIONS, []);
     return companyId && companyId !== 'comp_ardhnarishwar' ? all.filter(l => l.companyId === companyId) : all;
   }
   static saveLocations(locs: WorkLocation[]): void {
@@ -372,7 +90,7 @@ export class AttendanceDataStore {
   }
 
   static getShifts(companyId?: string): Shift[] {
-    const all = getStored<Shift[]>(ATTENDANCE_KEYS.SHIFTS, INITIAL_SHIFTS);
+    const all = getStored<Shift[]>(ATTENDANCE_KEYS.SHIFTS, []);
     return companyId && companyId !== 'comp_ardhnarishwar' ? all.filter(s => s.companyId === companyId) : all;
   }
   static saveShifts(shifts: Shift[]): void {
@@ -380,7 +98,7 @@ export class AttendanceDataStore {
   }
 
   static getEmployees(companyId?: string): Employee[] {
-    const all = getStored<Employee[]>(ATTENDANCE_KEYS.EMPLOYEES, INITIAL_EMPLOYEES);
+    const all = getStored<Employee[]>(ATTENDANCE_KEYS.EMPLOYEES, []);
     return companyId && companyId !== 'comp_ardhnarishwar' ? all.filter(e => e.companyId === companyId) : all;
   }
   static saveEmployees(employees: Employee[]): void {
@@ -388,7 +106,7 @@ export class AttendanceDataStore {
   }
 
   static getRecords(companyId?: string): AttendanceRecord[] {
-    const all = getStored<AttendanceRecord[]>(ATTENDANCE_KEYS.RECORDS, INITIAL_ATTENDANCE_RECORDS);
+    const all = getStored<AttendanceRecord[]>(ATTENDANCE_KEYS.RECORDS, []);
     return companyId && companyId !== 'comp_ardhnarishwar' ? all.filter(r => r.companyId === companyId) : all;
   }
   static saveRecords(records: AttendanceRecord[]): void {

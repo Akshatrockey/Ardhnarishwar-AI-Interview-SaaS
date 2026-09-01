@@ -106,6 +106,7 @@ CREATE TABLE jobs (
     location VARCHAR(255) NOT NULL,
     job_type ENUM('FULL_TIME', 'CONTRACT', 'REMOTE', 'HYBRID') NOT NULL DEFAULT 'FULL_TIME',
     experience_level ENUM('ENTRY', 'MID', 'SENIOR', 'LEAD', 'PRINCIPAL') NOT NULL DEFAULT 'SENIOR',
+    skill_category ENUM('SKILLED', 'UNSKILLED', 'SEMI_SKILLED') NOT NULL DEFAULT 'SKILLED',
     description TEXT NOT NULL,
     required_skills JSON NOT NULL, -- Array of required skills
     status ENUM('OPEN', 'CLOSED', 'DRAFT') NOT NULL DEFAULT 'OPEN',
@@ -123,7 +124,7 @@ CREATE TABLE interview_rounds (
     job_id VARCHAR(64) NOT NULL,
     name VARCHAR(255) NOT NULL,
     round_number INT UNSIGNED NOT NULL DEFAULT 1,
-    round_type ENUM('AI_SCREENING', 'TECHNICAL_ROBOTICS', 'SOFTWARE_SYSTEMS', 'HR_BEHAVIORAL', 'LEADERSHIP_PROBLEM_SOLVING') NOT NULL,
+    round_type ENUM('AI_SCREENING', 'TECHNICAL_ROBOTICS', 'SOFTWARE_SYSTEMS', 'PRACTICAL_OPERATIONS', 'GENERAL_APTITUDE', 'HR_BEHAVIORAL', 'LEADERSHIP_PROBLEM_SOLVING') NOT NULL,
     time_limit_minutes INT UNSIGNED NOT NULL DEFAULT 20,
     passing_score DECIMAL(5, 2) NOT NULL DEFAULT 70.00,
     allow_retake BOOLEAN NOT NULL DEFAULT FALSE,
@@ -138,8 +139,9 @@ CREATE TABLE interview_rounds (
 CREATE TABLE question_banks (
     id VARCHAR(64) PRIMARY KEY,
     company_id VARCHAR(64) NULL, -- NULL indicates global bank maintained by Super Admin
-    category ENUM('TECHNICAL', 'HR', 'BEHAVIORAL', 'PROBLEM_SOLVING', 'ROBOTICS_HARDWARE', 'CONTROL_SYSTEMS', 'EMBEDDED_C_CPP') NOT NULL,
+    category ENUM('TECHNICAL', 'HR', 'BEHAVIORAL', 'PROBLEM_SOLVING', 'PRACTICAL_SAFETY', 'OPERATIONAL_WORKFLOW', 'ROBOTICS_HARDWARE', 'CONTROL_SYSTEMS', 'EMBEDDED_C_CPP') NOT NULL,
     role_category VARCHAR(150) NOT NULL,
+    target_skill_level ENUM('SKILLED', 'UNSKILLED', 'ALL') NOT NULL DEFAULT 'ALL',
     difficulty ENUM('EASY', 'MEDIUM', 'HARD') NOT NULL DEFAULT 'MEDIUM',
     title VARCHAR(255) NOT NULL,
     prompt TEXT NOT NULL,
@@ -174,6 +176,7 @@ CREATE TABLE candidates (
     last_name VARCHAR(100) NOT NULL,
     email VARCHAR(255) NOT NULL,
     phone VARCHAR(50),
+    skill_category ENUM('SKILLED', 'UNSKILLED', 'SEMI_SKILLED') NOT NULL DEFAULT 'SKILLED',
     current_title VARCHAR(150),
     years_of_experience INT UNSIGNED NOT NULL DEFAULT 0,
     status ENUM('INVITED', 'IN_PROGRESS', 'EVALUATED', 'SHORTLISTED', 'REJECTED', 'HIRED') NOT NULL DEFAULT 'INVITED',
@@ -185,6 +188,26 @@ CREATE TABLE candidates (
     INDEX idx_candidates_company_job (company_id, job_id),
     INDEX idx_candidates_status (status),
     INDEX idx_candidates_token (interview_token)
+) ENGINE=InnoDB;
+
+-- Resumes Table
+CREATE TABLE resumes (
+    id VARCHAR(64) PRIMARY KEY,
+    candidate_id VARCHAR(64) NOT NULL,
+    company_id VARCHAR(64) NULL,
+    file_name VARCHAR(255) NOT NULL,
+    file_path TEXT NOT NULL,
+    file_size_bytes INT UNSIGNED NOT NULL DEFAULT 0,
+    file_type VARCHAR(100) NOT NULL,
+    status ENUM('PENDING', 'PARSED', 'VERIFIED', 'ACTIVE', 'ARCHIVED') NOT NULL DEFAULT 'ACTIVE',
+    parsed_text TEXT NULL,
+    uploaded_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (candidate_id) REFERENCES candidates(id) ON DELETE CASCADE,
+    FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
+    INDEX idx_resumes_candidate (candidate_id),
+    INDEX idx_resumes_company (company_id),
+    INDEX idx_resumes_status (status)
 ) ENGINE=InnoDB;
 
 -- Interview Sessions Table
@@ -289,8 +312,8 @@ CREATE TABLE locations (
     latitude DECIMAL(10, 8) NOT NULL,
     longitude DECIMAL(11, 8) NOT NULL,
     geofence_radius_meters INT UNSIGNED NOT NULL DEFAULT 150,
-    authorized_wifi_ssids JSON NOT NULL, -- Allowed Wi-Fi network SSIDs
-    authorized_ip_ranges JSON NULL,    -- Allowed corporate IP CIDR ranges
+    authorized_wifi_ssids JSON NOT NULL,
+    authorized_ip_ranges JSON NULL,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
@@ -328,7 +351,7 @@ CREATE TABLE employees (
     email VARCHAR(255) NOT NULL,
     phone VARCHAR(50),
     designation VARCHAR(150) NOT NULL,
-    face_template_hash VARCHAR(255) NULL, -- Cryptographic biometric hash
+    face_template_hash VARCHAR(255) NULL,
     joining_date DATE NOT NULL,
     status ENUM('ACTIVE', 'PROBATION', 'ON_LEAVE', 'TERMINATED') NOT NULL DEFAULT 'ACTIVE',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -379,7 +402,7 @@ CREATE TABLE attendance_records (
     INDEX idx_att_status (status)
 ) ENGINE=InnoDB;
 
--- Dynamic Rotating OTP Table (30s Time-based Check-in Tokens)
+-- Dynamic Rotating OTP Table
 CREATE TABLE dynamic_otps (
     id VARCHAR(64) PRIMARY KEY,
     company_id VARCHAR(64) NOT NULL,
@@ -394,23 +417,15 @@ CREATE TABLE dynamic_otps (
 ) ENGINE=InnoDB;
 
 -- ==============================================================================
--- 4. INITIAL SEED DATA
+-- 4. ROOT INITIALIZATION (Zero Mock Data)
 -- ==============================================================================
 
 -- Super Admin Organization
 INSERT INTO companies (id, name, slug, domain, plan_tier, status, max_jobs, max_candidates_per_month, max_employees, contact_email, contact_person, industry, ai_custom_rules_enabled)
 VALUES ('comp_ardhnarishwar', 'Ardhnarishwar HQ Global', 'ardhnarishwar', 'ardhnarishwar.ai', 'ENTERPRISE_ROBOTICS', 'ACTIVE', 999, 50000, 10000, 'hq@ardhnarishwar.ai', 'Platform Executive Director', 'Enterprise AI & SaaS Platforms', TRUE);
 
--- Client Companies
-INSERT INTO companies (id, name, slug, domain, plan_tier, status, max_jobs, max_candidates_per_month, max_employees, contact_email, contact_person, industry, ai_custom_rules_enabled)
-VALUES 
-('comp_cyberdyne', 'Cyberdyne Autonomous Systems', 'cyberdyne', 'cyberdyne.io', 'ENTERPRISE_ROBOTICS', 'ACTIVE', 50, 2000, 2500, 'talent@cyberdyne.io', 'Dr. Miles Bennett', 'Defense & Autonomous Robotics', TRUE),
-('comp_boston_bio', 'Boston BioRobotics Tech', 'boston-biorobotics', 'bostonbiorobotics.com', 'GROWTH', 'ACTIVE', 20, 500, 800, 'recruiting@bostonbiorobotics.com', 'Elena Rostova', 'Surgical & Bionic Robotics', FALSE),
-('comp_neural_matrix', 'NeuralMatrix Autonomous Fleet', 'neural-matrix', 'neuralmatrix.tech', 'STARTER', 'TRIAL', 5, 100, 200, 'founders@neuralmatrix.tech', 'Karan Mehra', 'Autonomous AGV & Warehouse Drones', FALSE);
-
--- Core Users
+-- Primary Super Administrator Account
 INSERT INTO users (id, company_id, email, password_hash, name, role, designation, status)
 VALUES
-('usr_super_admin', 'comp_ardhnarishwar', 'admin@ardhnarishwar.ai', '$2b$12$e8YQj0yvGv.5u/7Ue4tJp.e9bM0eH6oZzW2uJ5wZ8q8kY5w0e1m.', 'Ardhnarishwar Super Admin', 'SUPER_ADMIN', 'Global Platform Architect', 'ACTIVE'),
-('usr_cyberdyne_admin', 'comp_cyberdyne', 'admin@cyberdyne.io', '$2b$12$e8YQj0yvGv.5u/7Ue4tJp.e9bM0eH6oZzW2uJ5wZ8q8kY5w0e1m.', 'Dr. Miles Bennett', 'COMPANY_ADMIN', 'VP of Robotics Engineering', 'ACTIVE'),
-('usr_cyberdyne_recruiter', 'comp_cyberdyne', 'recruiter@cyberdyne.io', '$2b$12$e8YQj0yvGv.5u/7Ue4tJp.e9bM0eH6oZzW2uJ5wZ8q8kY5w0e1m.', 'Sarah Connor', 'RECRUITER', 'Principal Talent Partner', 'ACTIVE');
+('usr_super_admin', 'comp_ardhnarishwar', 'admin@ardhnarishwar.ai', 'pbkdf2:sha256:100000$c6543b593e8a4bb896894c25f46ef5ce$786720f4c2813158c56c221cfb77626359eaaeae427189a695191836dbf14fc2', 'Ardhnarishwar Super Admin', 'SUPER_ADMIN', 'Global Platform Architect', 'ACTIVE');
+

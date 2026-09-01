@@ -25,8 +25,9 @@ class Job(Base):
     location = Column(String(255), nullable=False)
     job_type = Column(Enum('FULL_TIME', 'CONTRACT', 'REMOTE', 'HYBRID', name='job_type_enum'), nullable=False, default='FULL_TIME')
     experience_level = Column(Enum('ENTRY', 'MID', 'SENIOR', 'LEAD', 'PRINCIPAL', name='exp_level_enum'), nullable=False, default='SENIOR')
+    skill_category = Column(String(32), nullable=False, default='SKILLED') # 'SKILLED', 'UNSKILLED', 'SEMI_SKILLED'
     description = Column(Text, nullable=False)
-    required_skills = Column(JSON, nullable=False) # JSON Array of strings
+    required_skills = Column(JSON, nullable=False, default=list) # JSON Array of strings
     status = Column(Enum('OPEN', 'CLOSED', 'DRAFT', name='job_status_enum'), nullable=False, default='OPEN')
     total_applicants = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
@@ -52,7 +53,7 @@ class InterviewRound(Base):
     name = Column(String(255), nullable=False)
     round_number = Column(Integer, nullable=False, default=1)
     round_type = Column(
-        Enum('AI_SCREENING', 'TECHNICAL_ROBOTICS', 'SOFTWARE_SYSTEMS', 'HR_BEHAVIORAL', 'LEADERSHIP_PROBLEM_SOLVING', name='round_type_enum'),
+        Enum('AI_SCREENING', 'TECHNICAL_ROBOTICS', 'SOFTWARE_SYSTEMS', 'PRACTICAL_OPERATIONS', 'GENERAL_APTITUDE', 'HR_BEHAVIORAL', 'LEADERSHIP_PROBLEM_SOLVING', name='round_type_enum'),
         nullable=False
     )
     time_limit_minutes = Column(Integer, nullable=False, default=20)
@@ -77,18 +78,19 @@ class QuestionBank(Base):
     id = Column(String(64), primary_key=True)
     company_id = Column(String(64), ForeignKey("companies.id", ondelete="CASCADE"), nullable=True) # Null for Super Admin global
     category = Column(
-        Enum('TECHNICAL', 'HR', 'BEHAVIORAL', 'PROBLEM_SOLVING', 'ROBOTICS_HARDWARE', 'CONTROL_SYSTEMS', 'EMBEDDED_C_CPP', name='question_cat_enum'),
+        Enum('TECHNICAL', 'HR', 'BEHAVIORAL', 'PROBLEM_SOLVING', 'PRACTICAL_SAFETY', 'OPERATIONAL_WORKFLOW', 'ROBOTICS_HARDWARE', 'CONTROL_SYSTEMS', 'EMBEDDED_C_CPP', name='question_cat_enum'),
         nullable=False
     )
-    role_category = Column(String(150), nullable=False)
+    role_category = Column(String(150), nullable=False, default='GENERAL')
+    target_skill_level = Column(String(32), nullable=False, default='ALL') # 'SKILLED', 'UNSKILLED', 'ALL'
     difficulty = Column(Enum('EASY', 'MEDIUM', 'HARD', name='difficulty_enum'), nullable=False, default='MEDIUM')
     title = Column(String(255), nullable=False)
     prompt = Column(Text, nullable=False)
     expected_duration_sec = Column(Integer, nullable=False, default=120)
     ideal_benchmark_answer = Column(Text, nullable=False)
-    key_concepts = Column(JSON, nullable=False)   # Array of required concept strings
-    anti_patterns = Column(JSON, nullable=False)  # Array of penalized misconceptions
-    rubric_weights = Column(JSON, nullable=False) # Object with dimension weight multipliers
+    key_concepts = Column(JSON, nullable=False, default=list)   # Array of required concept strings
+    anti_patterns = Column(JSON, nullable=False, default=list)  # Array of penalized misconceptions
+    rubric_weights = Column(JSON, nullable=False, default=lambda: {"technical": 0.45, "relevance": 0.30, "communication": 0.25}) # Object with dimension weight multipliers
     is_global = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 

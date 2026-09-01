@@ -207,6 +207,13 @@ export const CandidatePipeline: React.FC<CandidatePipelineProps> = ({
                           {c.firstName[0]}
                         </div>
                         <span>{c.firstName} {c.lastName}</span>
+                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                          c.skillCategory === 'UNSKILLED'
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                            : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                        }`}>
+                          {c.skillCategory === 'UNSKILLED' ? '👷 Workforce' : '🛠️ Skilled'}
+                        </span>
                       </div>
                       <div className="text-[11px] text-slate-400 ml-9">{c.email}</div>
                     </td>

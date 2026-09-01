@@ -43,10 +43,12 @@ services:
       - SECRET_KEY=${SECRET_KEY:-ardhnarishwar_jwt_production_secret_key_minimum_32_chars_long_2026}
       - ENVIRONMENT=${ENVIRONMENT:-production}
       - RECORDING_STORAGE_ROOT=/storage/recordings
+      - RESUME_STORAGE_ROOT=/storage/resumes
     ports:
       - "8000:8000"
     volumes:
       - recording_storage:/storage/recordings
+      - resume_storage:/storage/resumes
     depends_on:
       mysql_db:
         condition: service_healthy
@@ -70,6 +72,7 @@ services:
 volumes:
   mysql_data:
   recording_storage:
+  resume_storage:
 
 networks:
   ardhnarishwar_net:

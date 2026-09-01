@@ -3,14 +3,57 @@
  * Tests: Geofence radius calculation, 30s Dynamic OTP rotation, duplicate punch-in prevention, late calculation, and multi-tenant isolation.
  */
 
-import { AttendanceDataStore, INITIAL_EMPLOYEES, INITIAL_LOCATIONS, INITIAL_SHIFTS } from './src/services/attendanceStorage';
+import { AttendanceDataStore } from './src/services/attendanceStorage';
+import { WorkLocation, Employee, Shift, AttendanceRecord } from './src/types/attendance';
 
 console.log('================================================================');
 console.log('  TESTING ARDHNARISHWAR SMART ATTENDANCE RULES & TENANT ISOLATION');
 console.log('================================================================');
 
+// Initialize store and test entities
+const officeLoc: WorkLocation = {
+  id: 'loc_sf_hq',
+  companyId: 'comp_cyberdyne',
+  name: 'Cyberdyne San Francisco HQ',
+  address: '500 Howard St, San Francisco, CA 94105',
+  latitude: 37.789172,
+  longitude: -122.396821,
+  geofenceRadiusMeters: 100,
+  isActive: true,
+  createdAt: new Date().toISOString()
+};
+
+const testShift: Shift = {
+  id: 'shift_gen_morning',
+  companyId: 'comp_cyberdyne',
+  name: 'Standard Morning Shift',
+  startTime: '09:00',
+  endTime: '18:00',
+  gracePeriodMinutes: 15,
+  halfDayThresholdHours: 4.5,
+  isActive: true
+};
+
+const testEmp: Employee = {
+  id: 'emp_priya_01',
+  companyId: 'comp_cyberdyne',
+  employeeCode: 'CYB-001',
+  fullName: 'Dr. Priya Sharma',
+  email: 'priya.sharma@cyberdyne.io',
+  roleTitle: 'Principal Robotics Controls Architect',
+  departmentId: 'dept_eng_01',
+  assignedLocationId: 'loc_sf_hq',
+  assignedShiftId: 'shift_gen_morning',
+  status: 'ACTIVE',
+  joinedDate: '2024-01-15'
+};
+
+AttendanceDataStore.init();
+AttendanceDataStore.saveLocations([officeLoc]);
+AttendanceDataStore.saveEmployees([testEmp]);
+AttendanceDataStore.saveShifts([testShift]);
+
 // 1. Geofence Distance Calculation Test
-const officeLoc = INITIAL_LOCATIONS[0]; // SF HQ: 37.789172, -122.396821
 const insideCoords = { lat: 37.789180, lng: -122.396830 }; // ~2 meters away
 const outsideCoords = { lat: 37.795000, lng: -122.400000 }; // ~700 meters away
 
@@ -52,7 +95,6 @@ if (liveOTP.otpCode.length === 6 && liveOTP.secondsRemaining > 0 && liveOTP.seco
 }
 
 // 3. Duplicate Punch-In Prevention Test
-const testEmp = INITIAL_EMPLOYEES[0];
 const punch1 = AttendanceDataStore.recordPunchIn(
   testEmp,
   'CAMERA_FACIAL',

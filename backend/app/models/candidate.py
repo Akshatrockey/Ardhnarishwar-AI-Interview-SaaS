@@ -16,6 +16,7 @@ class Candidate(Base):
     last_name = Column(String(100), nullable=False)
     email = Column(String(255), nullable=False)
     phone = Column(String(50), nullable=True)
+    skill_category = Column(String(32), nullable=False, default='SKILLED')
     current_title = Column(String(150), nullable=True)
     years_of_experience = Column(Integer, nullable=False, default=0)
     status = Column(
@@ -32,6 +33,7 @@ class Candidate(Base):
     job = relationship("Job", back_populates="candidates")
     sessions = relationship("InterviewSession", back_populates="candidate", cascade="all, delete-orphan")
     ai_reports = relationship("AIEvaluationReport", back_populates="candidate", cascade="all, delete-orphan")
+    resumes = relationship("Resume", back_populates="candidate", cascade="all, delete-orphan")
 
     __table_args__ = (
         Index('idx_candidates_company_job', 'company_id', 'job_id'),
