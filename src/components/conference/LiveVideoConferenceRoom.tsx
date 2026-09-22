@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useTenant } from '../../context/TenantContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { ISpeechRecognitionConstructor, ISpeechRecognitionEvent, ISpeechRecognitionErrorEvent } from '../../types';
 import { 
   Video, 
   VideoOff, 
@@ -209,7 +210,7 @@ export const LiveVideoConferenceRoom: React.FC<LiveVideoConferenceRoomProps> = (
 
         // Setup Audio Analyser for Live dB Level Meter
         try {
-          const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+          const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
           if (AudioContextClass) {
             const audioCtx = new AudioContextClass();
             audioContextRef.current = audioCtx;
@@ -237,7 +238,7 @@ export const LiveVideoConferenceRoom: React.FC<LiveVideoConferenceRoomProps> = (
           console.warn('Web Audio API analysis fallback:', audioErr);
         }
 
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.warn('Could not acquire direct camera stream:', err);
         setHardwareError('Camera/Mic permission not granted. Falling back to synthetic HD stream.');
         setHasCameraPermission(false);
@@ -248,14 +249,16 @@ export const LiveVideoConferenceRoom: React.FC<LiveVideoConferenceRoomProps> = (
 
     // 2. Initialize Real-Time Speech Recognition if supported
     try {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      const SpeechRecognition =
+        (window as unknown as { SpeechRecognition?: ISpeechRecognitionConstructor; webkitSpeechRecognition?: ISpeechRecognitionConstructor }).SpeechRecognition ||
+        (window as unknown as { webkitSpeechRecognition?: ISpeechRecognitionConstructor }).webkitSpeechRecognition;
       if (SpeechRecognition) {
         const recognizer = new SpeechRecognition();
         recognizer.continuous = true;
         recognizer.interimResults = true;
         recognizer.lang = 'en-US';
 
-        recognizer.onresult = (event: any) => {
+        recognizer.onresult = (event: ISpeechRecognitionEvent) => {
           let interim = '';
           for (let i = event.resultIndex; i < event.results.length; ++i) {
             interim += event.results[i][0].transcript;
@@ -265,7 +268,7 @@ export const LiveVideoConferenceRoom: React.FC<LiveVideoConferenceRoomProps> = (
           }
         };
 
-        recognizer.onerror = (e: any) => console.warn('Speech recognition warning:', e);
+        recognizer.onerror = (e: ISpeechRecognitionErrorEvent) => console.warn('Speech recognition warning:', e);
         try {
           recognizer.start();
           recognitionRef.current = recognizer;

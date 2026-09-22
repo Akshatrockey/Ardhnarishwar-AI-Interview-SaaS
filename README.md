@@ -8,7 +8,8 @@ An enterprise-grade, multi-tenant B2B AI Interview & HRMS SaaS platform. Feature
 
 | Script | Purpose |
 |---|---|
-| 🚀 **`START_APPLICATION.bat`** | **Single 1-Click Launcher**: Starts FastAPI backend (`8000`), Vite frontend (`5173`), opens your browser, and creates a shareable public HTTPS tunnel link. |
+| 🚀 **`START_APPLICATION.bat`** | **Single 1-Click Launcher**: Verifies MySQL database, starts FastAPI backend (`8000`), Vite frontend (`5173`), opens browser, and creates public HTTPS tunnel. |
+| 🗄️ **`INIT_MYSQL.bat`** | **1-Click MySQL Initializer**: Provisions `ardhnarishwar_saas` database, verifies server connection, syncs all 14+ ORM tables, and creates default Super Admin. |
 | 🌐 **`run_public_url.bat`** | Launches the full-stack app with an instant global HTTPS tunnel via `localtunnel`. |
 | ☁️ **`sync_and_deploy.bat`** | Verifies builds, auto-stages changes, commits, and pushes to GitHub to trigger Vercel/Netlify/Render auto-deployment. |
 
@@ -43,6 +44,19 @@ An enterprise-grade, multi-tenant B2B AI Interview & HRMS SaaS platform. Feature
 ---
 
 ## 🚀 Quick Start (Manual)
+
+### Database (MySQL 8.0):
+```bash
+# 1-Click Setup (Windows):
+INIT_MYSQL.bat
+
+# Or manual Python script:
+backend\.venv\Scripts\python.exe backend/init_mysql.py
+
+# Or start containerized MySQL:
+docker compose up -d mysql_db
+```
+*Note: If local MySQL service is not yet started during development, the backend automatically logs a warning and uses a local SQLite fallback (`ardhnarishwar_local.db`) so your workflow is never interrupted.*
 
 ### Backend (FastAPI):
 ```bash

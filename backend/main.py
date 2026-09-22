@@ -8,7 +8,7 @@ from fastapi import FastAPI, Depends, HTTPException, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
 from typing import List, Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 import time
 import os
 import uuid
@@ -99,7 +99,7 @@ async def startup_bootstrap():
                 role="SUPER_ADMIN",
                 designation="Platform Architect & Super Administrator",
                 status="ACTIVE",
-                created_at=datetime.utcnow()
+                created_at=datetime.now(timezone.utc)
             )
             db.add(admin_user)
             db.commit()
@@ -168,7 +168,7 @@ async def login_endpoint(req: LoginRequest, db: Session = Depends(get_db)):
         expires_minutes=60
     )
 
-    user.last_login_at = datetime.utcnow()
+    user.last_login_at = datetime.now(timezone.utc)
     db.commit()
 
     return {
@@ -316,7 +316,7 @@ async def register_candidate_endpoint(req: CandidateRegisterRequest, db: Session
                 contact_email="careers@ardhnarishwar.ai",
                 contact_person="Talent Team",
                 industry="Artificial Intelligence & Technology",
-                created_at=datetime.utcnow()
+                created_at=datetime.now(timezone.utc)
             )
             db.add(first_comp)
             db.flush()
@@ -339,7 +339,7 @@ async def register_candidate_endpoint(req: CandidateRegisterRequest, db: Session
                 required_skills=["Core Domain", "Communication", "Problem Solving"],
                 description="Professional AI interview assessment position.",
                 status="OPEN",
-                created_at=datetime.utcnow()
+                created_at=datetime.now(timezone.utc)
             )
             db.add(first_job)
             db.flush()
@@ -356,7 +356,7 @@ async def register_candidate_endpoint(req: CandidateRegisterRequest, db: Session
         years_of_experience=exp,
         status="SHORTLISTED",
         interview_token=token,
-        applied_at=datetime.utcnow()
+        applied_at=datetime.now(timezone.utc)
     )
     db.add(new_cand)
 
@@ -430,7 +430,7 @@ async def register_company_endpoint(req: CompanyRegisterRequest, db: Session = D
         contact_email=contact_email,
         contact_person=comp_data.get("contactPerson") or comp_data.get("contact_person", "Admin Lead"),
         industry=comp_data.get("industry", "Technology"),
-        created_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc)
     )
 
     admin_pass = adm_data.get("password") or "SecurePassword123!"
@@ -451,7 +451,7 @@ async def register_company_endpoint(req: CompanyRegisterRequest, db: Session = D
         company_id=new_comp.id,
         status="ACTIVE",
         designation="Company Administrator",
-        created_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc)
     )
 
     db.add(new_comp)
@@ -499,7 +499,7 @@ async def register_employee_endpoint(req: EmployeeRegisterRequest, db: Session =
         company_id=c_id,
         designation=req.designation or "Staff Member",
         status="ACTIVE",
-        created_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc)
     )
     db.add(new_user)
     try:

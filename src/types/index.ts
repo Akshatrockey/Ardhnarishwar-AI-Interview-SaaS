@@ -165,7 +165,7 @@ export interface Candidate {
   firstName: string;
   lastName: string;
   email: string;
-  phone: string;
+  phone?: string;
   skillCategory?: SkillCategory;
   currentTitle?: string;
   yearsOfExperience: number;
@@ -451,4 +451,99 @@ export interface RealtimeMessage<T = any> {
   targetRoom?: string;
   payload: T;
   timestamp: number;
+}
+
+export type JobType = 'FULL_TIME' | 'CONTRACT' | 'REMOTE' | 'HYBRID';
+export type QuestionType =
+  | 'TECHNICAL'
+  | 'BEHAVIORAL'
+  | 'CONCEPTUAL'
+  | 'CODING'
+  | 'SYSTEM_DESIGN'
+  | 'PRACTICAL'
+  | 'HR';
+export type SessionStatus = 'SCHEDULED' | 'RECORDING' | 'ANALYZING' | 'COMPLETED' | 'ABANDONED';
+export type ProctoringFlag = RealtimeProctorFlag;
+
+// ---------------------------------------------------------------------------
+// Browser Media & Web Speech API Types
+// ---------------------------------------------------------------------------
+export interface ISpeechRecognitionAlternative {
+  transcript: string;
+  confidence: number;
+}
+
+export interface ISpeechRecognitionResult {
+  readonly length: number;
+  item(index: number): ISpeechRecognitionAlternative;
+  [index: number]: ISpeechRecognitionAlternative;
+  isFinal: boolean;
+}
+
+export interface ISpeechRecognitionResultList {
+  readonly length: number;
+  item(index: number): ISpeechRecognitionResult;
+  [index: number]: ISpeechRecognitionResult;
+}
+
+export interface ISpeechRecognitionEvent {
+  resultIndex: number;
+  results: ISpeechRecognitionResultList;
+}
+
+export interface ISpeechRecognitionErrorEvent {
+  error: string;
+  message?: string;
+}
+
+export interface ISpeechRecognitionInstance {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start(): void;
+  stop(): void;
+  abort(): void;
+  onresult: ((event: ISpeechRecognitionEvent) => void) | null;
+  onerror: ((event: ISpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+  onstart?: (() => void) | null;
+}
+
+export type ISpeechRecognitionConstructor = new () => ISpeechRecognitionInstance;
+
+// ---------------------------------------------------------------------------
+// Typed Backend API Payloads
+// ---------------------------------------------------------------------------
+export interface CreateJobPayload {
+  companyId?: string;
+  title: string;
+  department: string;
+  description: string;
+  requirements: string[];
+  experienceLevel: ExperienceLevel;
+  skillCategory: SkillCategory;
+  location: string;
+  jobType: JobType;
+  roundIds: string[];
+  maxCandidates: number;
+  status: JobStatus;
+}
+
+export interface AddQuestionPayload {
+  text: string;
+  questionType: QuestionType;
+  difficulty: DifficultyLevel;
+  skillCategory?: SkillCategory;
+  expectedKeywords?: string[];
+  idealAnswer?: string;
+  maxScore?: number;
+}
+
+export interface CompleteInterviewPayload {
+  status?: SessionStatus;
+  overallScore?: number;
+  scores?: Record<string, number>;
+  feedback?: string;
+  proctoringFlags?: ProctoringFlag[];
+  durationMinutes?: number;
 }

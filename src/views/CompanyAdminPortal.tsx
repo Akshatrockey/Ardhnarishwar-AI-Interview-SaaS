@@ -53,7 +53,7 @@ import {
 interface CompanyAdminPortalProps {
   onSwitchToSuperAdmin: () => void;
   onSwitchToStaff: () => void;
-  onSwitchToCandidate: () => void;
+  onSwitchToCandidate: (candidateOrToken?: Candidate | string) => void;
   onLogout: () => void;
   onOpenLandingPage: () => void;
 }
@@ -138,6 +138,7 @@ export const CompanyAdminPortal: React.FC<CompanyAdminPortalProps> = ({
           <CompanyDashboard
             onSelectCandidate={(id: string) => setSelectedCandidateId(id)}
             onNavigateTab={setActiveTab}
+            onLaunchLiveInterview={onSwitchToCandidate}
           />
         );
       case 'candidates':
@@ -189,7 +190,7 @@ export const CompanyAdminPortal: React.FC<CompanyAdminPortalProps> = ({
           />
         );
       case 'jobs':
-        return <JobManager />;
+        return <JobManager onLaunchLiveInterview={onSwitchToCandidate} />;
       case 'rounds':
         return <InterviewRoundsConfig />;
       case 'email_settings':
@@ -201,6 +202,7 @@ export const CompanyAdminPortal: React.FC<CompanyAdminPortalProps> = ({
           <CompanyDashboard
             onSelectCandidate={(id: string) => setSelectedCandidateId(id)}
             onNavigateTab={setActiveTab}
+            onLaunchLiveInterview={onSwitchToCandidate}
           />
         );
     }

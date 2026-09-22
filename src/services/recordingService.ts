@@ -18,7 +18,8 @@ export interface RecordingUploadResult {
 }
 
 export class RecordingService {
-  private static BACKEND_API_BASE = (import.meta as any).env?.VITE_API_URL || '';
+  private static BACKEND_API_BASE: string =
+    (import.meta as unknown as { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL || '';
 
   /**
    * Uploads candidate recording blob to backend isolated vault with candidate token authorization.

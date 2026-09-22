@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
+import { ISpeechRecognitionConstructor, ISpeechRecognitionEvent } from '../../types';
 import { 
   Bot, 
   MessageSquare, 
@@ -66,14 +67,17 @@ export const AIChatbox: React.FC = () => {
 
   // Initialize Speech Recognition
   useEffect(() => {
-    const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const SpeechRec =
+      (window as unknown as { SpeechRecognition?: ISpeechRecognitionConstructor; webkitSpeechRecognition?: ISpeechRecognitionConstructor }).SpeechRecognition ||
+      (window as unknown as { webkitSpeechRecognition?: ISpeechRecognitionConstructor }).webkitSpeechRecognition;
+
     if (SpeechRec) {
       const recognition = new SpeechRec();
       recognition.continuous = false;
       recognition.interimResults = false;
       recognition.lang = currentLanguageOption.speechLang || 'en-US';
 
-      recognition.onresult = (e: any) => {
+      recognition.onresult = (e: ISpeechRecognitionEvent) => {
         const transcript = e.results[0][0].transcript;
         setInputMessage(prev => (prev ? `${prev} ${transcript}` : transcript));
         setIsListening(false);

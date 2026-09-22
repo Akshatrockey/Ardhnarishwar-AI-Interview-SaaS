@@ -108,7 +108,8 @@ export const CandidatePortal: React.FC<CandidatePortalProps> = ({
   const [profileSkills, setProfileSkills] = useState('');
   const [profileSavedMsg, setProfileSavedMsg] = useState('');
 
-  const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || '';
+  const API_BASE_URL: string =
+    (import.meta as unknown as { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL || '';
 
   // Load real jobs from backend API
   const fetchOpenJobs = async () => {
@@ -221,7 +222,7 @@ export const CandidatePortal: React.FC<CandidatePortalProps> = ({
           passingScore: initData.round.passing_score || 70,
           allowRetake: false,
           proctoringStrictness: 'MILITARY_GRADE',
-          questionIds: initData.questions.map((q: any) => q.id)
+          questionIds: initData.questions.map((q: Question) => q.id)
         };
 
         setCandidate(candData);
@@ -326,8 +327,9 @@ export const CandidatePortal: React.FC<CandidatePortalProps> = ({
         });
         setResumeUploadSuccess(`Resume "${file.name}" cached and ready for applications.`);
       }
-    } catch (err: any) {
-      setResumeUploadError('Upload failed: ' + (err.message || 'Network error'));
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Network error';
+      setResumeUploadError('Upload failed: ' + message);
     } finally {
       setIsUploadingResume(false);
       setTimeout(() => setResumeUploadSuccess(null), 5000);
@@ -335,7 +337,7 @@ export const CandidatePortal: React.FC<CandidatePortalProps> = ({
   };
 
   // Apply for Job Handler
-  const handleApplyForJob = async (jobToApply: any) => {
+  const handleApplyForJob = async (jobToApply: JobPosition) => {
     if (!profileFirstName.trim() || !profileEmail.trim()) {
       setActivePortalTab('profile');
       setProfileSavedMsg('Please complete your Name and Email before submitting an application.');
@@ -363,8 +365,9 @@ export const CandidatePortal: React.FC<CandidatePortalProps> = ({
         setActivePortalTab('dashboard');
         alert(`Application submitted successfully! Your invitation token is: ${token}. You can now start your interview.`);
       }
-    } catch (e: any) {
-      alert('Application submission error: ' + (e.message || 'Failed to connect to backend'));
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Failed to connect to backend';
+      alert('Application submission error: ' + message);
     }
   };
 

@@ -40,17 +40,18 @@ class Settings(BaseSettings):
     RATE_LIMIT_API_PER_MINUTE: int = int(os.getenv("RATE_LIMIT_API_PER_MINUTE", 120))
 
     # CORS Allowed Origins
-    ALLOWED_ORIGINS_RAW: str = os.getenv(
+    ALLOWED_ORIGINS: str = os.getenv(
         "ALLOWED_ORIGINS",
         "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
     )
+    ALLOWED_ORIGINS_RAW: Optional[str] = None
 
     def get_allowed_origins(self) -> List[str]:
         """
         Parses and sanitizes comma-separated allowed origins.
         Never allows wildcard '*' with credentials.
         """
-        raw = self.ALLOWED_ORIGINS_RAW.strip()
+        raw = (self.ALLOWED_ORIGINS or self.ALLOWED_ORIGINS_RAW or "").strip()
         if not raw:
             return ["http://localhost:5173", "http://127.0.0.1:5173"]
         origins = [origin.strip() for origin in raw.split(",") if origin.strip() and origin.strip() != "*"]
@@ -58,13 +59,25 @@ class Settings(BaseSettings):
 
     def get_database_url(self) -> str:
         """
-        Constructs database URL securely or falls back to SQLite for tests.
+        Constructs database URL securely prioritizing MySQL (supporting passwordless root)
+        or falls back to SQLite for local offline tests.
         """
         if self.DATABASE_URL:
             return self.DATABASE_URL
-        if self.MYSQL_USER and self.MYSQL_PASSWORD:
-            return f"mysql+pymysql://{self.MYSQL_USER}:{self.MYSQL_PASSWORD}@{self.MYSQL_HOST}:{self.MYSQL_PORT}/{self.MYSQL_DATABASE}?charset=utf8mb4"
+        if self.MYSQL_USER:
+            password_part = f":{self.MYSQL_PASSWORD}" if self.MYSQL_PASSWORD else ""
+            return f"mysql+pymysql://{self.MYSQL_USER}{password_part}@{self.MYSQL_HOST}:{self.MYSQL_PORT}/{self.MYSQL_DATABASE}?charset=utf8mb4"
         return self.SQLITE_TEST_URL
+
+    def get_mysql_server_url(self) -> Optional[str]:
+        """
+        Returns connection string to the MySQL server instance without a database selected,
+        enabling automated database provisioning (CREATE DATABASE IF NOT EXISTS).
+        """
+        if self.MYSQL_USER:
+            password_part = f":{self.MYSQL_PASSWORD}" if self.MYSQL_PASSWORD else ""
+            return f"mysql+pymysql://{self.MYSQL_USER}{password_part}@{self.MYSQL_HOST}:{self.MYSQL_PORT}/?charset=utf8mb4"
+        return None
 
     def validate_production_secrets(self) -> None:
         """
@@ -81,8 +94,9 @@ class Settings(BaseSettings):
                 )
 
     class Config:
-        case_sensitive = True
+        case_sensitive = False
         env_file = ".env"
+        extra = "ignore"
 
 settings = Settings()
 

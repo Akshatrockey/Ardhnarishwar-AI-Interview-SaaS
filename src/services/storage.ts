@@ -1,6 +1,48 @@
 // Persistent Client-Side Data Store & IndexedDB Video Chunk Manager (Production Real-Time)
 import { Company, User, JobPosition, InterviewRound, Question, Candidate, InterviewSession, AuditLog, SubscriptionPlan, AIEngineHyperparams } from '../types';
 import { DEFAULT_AI_HYPERPARAMS } from '../ai-engine/scoringPipeline';
+import {
+  INITIAL_COMPANIES,
+  INITIAL_USERS,
+  INITIAL_JOBS,
+  INITIAL_ROUNDS,
+  ALL_INITIAL_QUESTIONS,
+  INITIAL_CANDIDATES,
+  INITIAL_SESSIONS,
+  INITIAL_AUDIT_LOGS,
+} from '../ai-engine/datasets/seedData';
+
+/**
+ * Universal cross-browser copy to clipboard with fallback for unsecured contexts and iframes
+ */
+export async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch (err) {
+    console.warn('navigator.clipboard failed, using fallback execCommand:', err);
+  }
+
+  try {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    textArea.style.left = '-999999px';
+    textArea.style.top = '-999999px';
+    textArea.setAttribute('readonly', '');
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    const successful = document.execCommand('copy');
+    document.body.removeChild(textArea);
+    return successful;
+  } catch (err) {
+    console.error('Failed to copy text using fallback:', err);
+    return false;
+  }
+}
 
 const STORAGE_KEYS = {
   COMPANIES: 'ardhnarishwar_companies_v1',
@@ -99,32 +141,48 @@ function setStored<T>(key: string, val: T): void {
 }
 
 export class AppDataStore {
-  // Initialize clean production state with ZERO demo records
+  // Initialize production state with rich enterprise seed records when empty
   static init(): void {
-    if (getStored(STORAGE_KEYS.COMPANIES, null) === null) {
-      setStored(STORAGE_KEYS.COMPANIES, []);
+    const storedCompanies = getStored<Company[] | null>(STORAGE_KEYS.COMPANIES, null);
+    if (!storedCompanies || storedCompanies.length === 0) {
+      setStored(STORAGE_KEYS.COMPANIES, INITIAL_COMPANIES);
     }
-    if (getStored(STORAGE_KEYS.USERS, null) === null) {
-      setStored(STORAGE_KEYS.USERS, []);
+
+    const storedUsers = getStored<User[] | null>(STORAGE_KEYS.USERS, null);
+    if (!storedUsers || storedUsers.length === 0) {
+      setStored(STORAGE_KEYS.USERS, INITIAL_USERS);
     }
-    if (getStored(STORAGE_KEYS.JOBS, null) === null) {
-      setStored(STORAGE_KEYS.JOBS, []);
+
+    const storedJobs = getStored<JobPosition[] | null>(STORAGE_KEYS.JOBS, null);
+    if (!storedJobs || storedJobs.length === 0) {
+      setStored(STORAGE_KEYS.JOBS, INITIAL_JOBS);
     }
-    if (getStored(STORAGE_KEYS.ROUNDS, null) === null) {
-      setStored(STORAGE_KEYS.ROUNDS, []);
+
+    const storedRounds = getStored<InterviewRound[] | null>(STORAGE_KEYS.ROUNDS, null);
+    if (!storedRounds || storedRounds.length === 0) {
+      setStored(STORAGE_KEYS.ROUNDS, INITIAL_ROUNDS);
     }
-    if (getStored(STORAGE_KEYS.QUESTIONS, null) === null) {
-      setStored(STORAGE_KEYS.QUESTIONS, []);
+
+    const storedQuestions = getStored<Question[] | null>(STORAGE_KEYS.QUESTIONS, null);
+    if (!storedQuestions || storedQuestions.length === 0) {
+      setStored(STORAGE_KEYS.QUESTIONS, ALL_INITIAL_QUESTIONS);
     }
-    if (getStored(STORAGE_KEYS.CANDIDATES, null) === null) {
-      setStored(STORAGE_KEYS.CANDIDATES, []);
+
+    const storedCandidates = getStored<Candidate[] | null>(STORAGE_KEYS.CANDIDATES, null);
+    if (!storedCandidates || storedCandidates.length === 0) {
+      setStored(STORAGE_KEYS.CANDIDATES, INITIAL_CANDIDATES);
     }
-    if (getStored(STORAGE_KEYS.SESSIONS, null) === null) {
-      setStored(STORAGE_KEYS.SESSIONS, []);
+
+    const storedSessions = getStored<InterviewSession[] | null>(STORAGE_KEYS.SESSIONS, null);
+    if (!storedSessions || storedSessions.length === 0) {
+      setStored(STORAGE_KEYS.SESSIONS, INITIAL_SESSIONS);
     }
-    if (getStored(STORAGE_KEYS.AUDIT_LOGS, null) === null) {
-      setStored(STORAGE_KEYS.AUDIT_LOGS, []);
+
+    const storedAuditLogs = getStored<AuditLog[] | null>(STORAGE_KEYS.AUDIT_LOGS, null);
+    if (!storedAuditLogs || storedAuditLogs.length === 0) {
+      setStored(STORAGE_KEYS.AUDIT_LOGS, INITIAL_AUDIT_LOGS);
     }
+
     if (getStored(STORAGE_KEYS.HYPERPARAMS, null) === null) {
       setStored(STORAGE_KEYS.HYPERPARAMS, DEFAULT_AI_HYPERPARAMS);
     }
@@ -171,9 +229,27 @@ export class AppDataStore {
   }
 
   // Candidate Security: Strip Expected Answer, Criteria, Keywords & Rubric for candidate chamber views
-  static sanitizeQuestionForCandidate(q: Question): Omit<Question, 'expectedAnswer' | 'idealBenchmarkAnswer' | 'evaluationCriteria' | 'keyConcepts' | 'antiPatterns' | 'rubric'> {
-    const { expectedAnswer, idealBenchmarkAnswer, evaluationCriteria, keyConcepts, antiPatterns, rubric, ...safeQuestion } = q;
-    return safeQuestion as any;
+  static sanitizeQuestionForCandidate(
+    q: Question
+  ): Omit<
+    Question,
+    | 'expectedAnswer'
+    | 'idealBenchmarkAnswer'
+    | 'evaluationCriteria'
+    | 'keyConcepts'
+    | 'antiPatterns'
+    | 'rubric'
+  > {
+    const {
+      expectedAnswer,
+      idealBenchmarkAnswer,
+      evaluationCriteria,
+      keyConcepts,
+      antiPatterns,
+      rubric,
+      ...safeQuestion
+    } = q;
+    return safeQuestion;
   }
 
   static sanitizeQuestionsForCandidate(qs: Question[]): Question[] {

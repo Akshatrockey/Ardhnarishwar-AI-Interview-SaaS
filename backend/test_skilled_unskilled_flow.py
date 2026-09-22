@@ -8,8 +8,6 @@ Verifies that:
 """
 import os
 import sys
-import uuid
-import pytest
 from fastapi.testclient import TestClient
 
 backend_dir = os.path.abspath(os.path.dirname(__file__))

@@ -171,8 +171,9 @@ export const GlobalAuthPortal: React.FC<GlobalAuthPortalProps> = ({
       } else {
         setCompanyLoginError(res.message || 'Invalid work email or password. Please verify your company credentials or register a workspace.');
       }
-    } catch (err: any) {
-      setCompanyLoginError(err.message || 'Company sign in failed. Please try again.');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Company sign in failed. Please try again.';
+      setCompanyLoginError(message);
     } finally {
       setIsLoading(false);
     }
@@ -211,8 +212,9 @@ export const GlobalAuthPortal: React.FC<GlobalAuthPortalProps> = ({
       } else {
         setCandLoginError(verifyRes.message || 'Candidate record or token not found. Please register to receive an interview token.');
       }
-    } catch (err: any) {
-      setCandLoginError(err.message || 'Candidate verification failed.');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Candidate verification failed.';
+      setCandLoginError(message);
     } finally {
       setIsLoading(false);
     }
@@ -237,8 +239,9 @@ export const GlobalAuthPortal: React.FC<GlobalAuthPortalProps> = ({
       } else {
         setSuperAdminError(res.message || 'Invalid Super Admin credentials. Authorized personnel only.');
       }
-    } catch (err: any) {
-      setSuperAdminError(err.message || 'Super Admin authentication failed.');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Super Admin authentication failed.';
+      setSuperAdminError(message);
     } finally {
       setIsLoading(false);
     }
@@ -282,8 +285,9 @@ export const GlobalAuthPortal: React.FC<GlobalAuthPortalProps> = ({
       } else {
         setRegCompError(res.message || 'Company registration failed. Domain or email may already be in use.');
       }
-    } catch (err: any) {
-      setRegCompError(err.message || 'Failed to create company workspace.');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to create company workspace.';
+      setRegCompError(message);
     } finally {
       setIsLoading(false);
     }
@@ -312,7 +316,7 @@ export const GlobalAuthPortal: React.FC<GlobalAuthPortalProps> = ({
         setRegCandResumeName(file.name);
         setRegCandResumeSize(file.size);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.warn('Resume upload fallback to local state:', err);
       setRegCandResumeFile(file);
       setRegCandResumeName(file.name);
@@ -351,8 +355,9 @@ export const GlobalAuthPortal: React.FC<GlobalAuthPortalProps> = ({
       } else {
         setRegCandError(res.message || 'Candidate registration failed. Please verify your details.');
       }
-    } catch (err: any) {
-      setRegCandError(err.message || 'Candidate registration failed.');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Candidate registration failed.';
+      setRegCandError(message);
     } finally {
       setIsLoading(false);
     }

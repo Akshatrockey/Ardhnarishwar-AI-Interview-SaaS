@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Question, Candidate, JobPosition, InterviewRound, CandidateAnswer, InterviewSession } from '../../types';
+import { Question, Candidate, JobPosition, InterviewRound, CandidateAnswer, InterviewSession, ISpeechRecognitionConstructor, ISpeechRecognitionEvent } from '../../types';
 import { evaluateCandidateAnswer, compileSessionEvaluationReport } from '../../ai-engine/scoringPipeline';
 import { AppDataStore, saveVideoBlob } from '../../services/storage';
 import { useLanguage } from '../../context/LanguageContext';
@@ -126,14 +126,17 @@ export const LiveAIInterviewChamber: React.FC<LiveAIInterviewChamberProps> = ({
 
   // 2. Setup Multilingual Speech Recognition
   useEffect(() => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const SpeechRecognition =
+      (window as unknown as { SpeechRecognition?: ISpeechRecognitionConstructor; webkitSpeechRecognition?: ISpeechRecognitionConstructor }).SpeechRecognition ||
+      (window as unknown as { webkitSpeechRecognition?: ISpeechRecognitionConstructor }).webkitSpeechRecognition;
+
     if (SpeechRecognition) {
       const recognition = new SpeechRecognition();
       recognition.continuous = true;
       recognition.interimResults = true;
       recognition.lang = currentLanguageOption.speechLang || 'en-US';
 
-      recognition.onresult = (event: any) => {
+      recognition.onresult = (event: ISpeechRecognitionEvent) => {
         let finalTranscript = '';
         for (let i = event.resultIndex; i < event.results.length; ++i) {
           if (event.results[i].isFinal) {

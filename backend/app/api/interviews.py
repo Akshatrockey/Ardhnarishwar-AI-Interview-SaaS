@@ -12,7 +12,7 @@ import uuid
 import time
 import hashlib
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..core.database import get_db
 from ..core.rate_limiter import enforce_api_rate_limit
@@ -86,7 +86,7 @@ async def initiate_interview_session_endpoint(req: SessionInitiateRequest, db: S
                 required_skills=["Core Domain", "Problem Solving", "Communication"],
                 description="Professional AI interview assessment position.",
                 status="OPEN",
-                created_at=datetime.utcnow()
+                created_at=datetime.now(timezone.utc)
             )
             db.add(first_job)
             db.flush()
@@ -109,7 +109,7 @@ async def initiate_interview_session_endpoint(req: SessionInitiateRequest, db: S
             time_limit_minutes=25,
             passing_score=70.0,
             proctoring_strictness="MILITARY_GRADE",
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
         db.add(round_obj)
         db.flush()
@@ -128,9 +128,9 @@ async def initiate_interview_session_endpoint(req: SessionInitiateRequest, db: S
             candidate_id=cand.id,
             job_id=job.id,
             round_id=round_obj.id,
-            started_at=datetime.utcnow(),
+            started_at=datetime.now(timezone.utc),
             status="RECORDING",
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
         db.add(session)
         cand.status = "IN_PROGRESS"
@@ -212,7 +212,7 @@ async def initiate_interview_session_endpoint(req: SessionInitiateRequest, db: S
                     anti_patterns=["lack of specifics", "unclear reasoning"],
                     rubric_weights={"technical": 0.45, "relevance": 0.30, "communication": 0.25},
                     is_global=True,
-                    created_at=datetime.utcnow()
+                    created_at=datetime.now(timezone.utc)
                 )
                 db.add(existing_q)
                 db.flush()
@@ -286,7 +286,7 @@ async def submit_candidate_answer_endpoint(
             anti_patterns=[],
             rubric_weights={"technical": 0.45, "relevance": 0.30, "communication": 0.25},
             is_global=True,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
         db.add(question)
         db.flush()
@@ -346,7 +346,7 @@ async def submit_candidate_answer_endpoint(
         filler_word_count=sum(lower_transcript.count(f) for f in ["um", "uh", "like", "you know"]),
         wpm=wpm,
         speech_hesitation_ratio=0.05,
-        created_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc)
     )
     db.add(answer_record)
     db.commit()
@@ -453,12 +453,12 @@ async def complete_interview_session_endpoint(
         executive_summary=exec_summary,
         model_version_snapshot=snapshot,
         reproducibility_hash=repro_hash,
-        generated_at=datetime.utcnow()
+        generated_at=datetime.now(timezone.utc)
     )
     db.add(report)
 
     session.status = "COMPLETED"
-    session.completed_at = datetime.utcnow()
+    session.completed_at = datetime.now(timezone.utc)
     session.overall_score = round(avg_score, 1)
     session.recommendation = rec
     if req.system_diagnostics:

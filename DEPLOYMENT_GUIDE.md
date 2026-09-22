@@ -62,7 +62,7 @@ git push -u origin main
 2. Click **"Add New..."** > **"Project"**.
 3. Import your `Ardhnarishwar-AI-Interview-SaaS` repository.
 4. In the Project Configuration:
-   - **Framework Preset**: `Vite` (automatically detected from [`vercel.json`](file:///c:/Users/varsha/OneDrive/Desktop/Ardhnarishwar-AI-Interview-SaaS/vercel.json))
+   - **Framework Preset**: `Vite` (automatically detected from [`vercel.json`](file:///c:/Users/varsha/Ardhnarishwar-AI-Interview-SaaS/vercel.json))
    - **Root Directory**: `./` (default)
    - **Build Command**: `npm run build`
    - **Output Directory**: `dist`
@@ -101,7 +101,7 @@ git push -u origin main
 1. Go to [https://app.netlify.com](https://app.netlify.com).
 2. Click **"Add new site"** > **"Import an existing project"**.
 3. Connect with GitHub and select your repository.
-4. Netlify will automatically detect [`netlify.toml`](file:///c:/Users/varsha/OneDrive/Desktop/Ardhnarishwar-AI-Interview-SaaS/netlify.toml):
+4. Netlify will automatically detect [`netlify.toml`](file:///c:/Users/varsha/Ardhnarishwar-AI-Interview-SaaS/netlify.toml):
    - **Build command**: `npm run build`
    - **Publish directory**: `dist`
 5. Click **"Deploy site"**.
@@ -111,7 +111,7 @@ git push -u origin main
 
 ## 📦 Method 3: 1-Click Render Blueprint (`render.yaml`)
 
-We have included a complete [`render.yaml`](file:///c:/Users/varsha/OneDrive/Desktop/Ardhnarishwar-AI-Interview-SaaS/render.yaml) Blueprint in the root directory.
+We have included a complete [`render.yaml`](file:///c:/Users/varsha/Ardhnarishwar-AI-Interview-SaaS/render.yaml) Blueprint in the root directory.
 
 1. Go to [https://dashboard.render.com/blueprints](https://dashboard.render.com/blueprints).
 2. Click **"New Blueprint Instance"**.

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { JobPosition, ExperienceLevel, Question, QuestionCategory, InterviewRound, JobStatus } from '../../types';
-import { AppDataStore } from '../../services/storage';
+import { JobPosition, ExperienceLevel, Question, QuestionCategory, InterviewRound, JobStatus, Candidate } from '../../types';
+import { AppDataStore, copyToClipboard } from '../../services/storage';
+import { ApiClient } from '../../services/apiClient';
 import { useTenant } from '../../context/TenantContext';
 import { 
   Briefcase, 
@@ -23,10 +24,20 @@ import {
   HelpCircle,
   ChevronDown,
   ChevronUp,
-  X
+  X,
+  UserPlus,
+  Send,
+  ExternalLink,
+  Play,
+  Check,
+  Mail
 } from 'lucide-react';
 
-export const JobManager: React.FC = () => {
+interface JobManagerProps {
+  onLaunchLiveInterview?: (candidate: Candidate) => void;
+}
+
+export const JobManager: React.FC<JobManagerProps> = ({ onLaunchLiveInterview }) => {
   const { currentCompany } = useTenant();
   const [jobs, setJobs] = useState<JobPosition[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -40,6 +51,21 @@ export const JobManager: React.FC = () => {
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Candidate Invite Modal State
+  const [showInviteCandidateModal, setShowInviteCandidateModal] = useState(false);
+  const [targetJobForInvite, setTargetJobForInvite] = useState<JobPosition | null>(null);
+  const [inviteFirstName, setInviteFirstName] = useState('');
+  const [inviteLastName, setInviteLastName] = useState('');
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [invitePhone, setInvitePhone] = useState('');
+  const [inviteExperience, setInviteExperience] = useState<number>(3);
+  const [inviteSkillCategory, setInviteSkillCategory] = useState<'SKILLED' | 'UNSKILLED' | 'SEMI_SKILLED'>('SKILLED');
+  const [inviteJobId, setInviteJobId] = useState<string>('');
+  const [createdInviteResult, setCreatedInviteResult] = useState<{ candidate: Candidate; link: string; jobTitle: string } | null>(null);
+  const [copiedLinkState, setCopiedLinkState] = useState(false);
+  const [inviteSubmitting, setInviteSubmitting] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
 
   // New Job Form State
   const [title, setTitle] = useState('');
@@ -144,6 +170,127 @@ export const JobManager: React.FC = () => {
     setTitle('');
     setDescription('');
     setSkillsStr('');
+  };
+
+  // Candidate Invitation Handlers
+  const handleOpenInviteModal = (job: JobPosition | null) => {
+    setInviteError(null);
+    setCreatedInviteResult(null);
+    setInviteFirstName('');
+    setInviteLastName('');
+    setInviteEmail('');
+    setInvitePhone('');
+    setInviteExperience(3);
+    setInviteSkillCategory('SKILLED');
+    if (job) {
+      setTargetJobForInvite(job);
+      setInviteJobId(job.id);
+    } else if (jobs.length > 0) {
+      setTargetJobForInvite(jobs[0]);
+      setInviteJobId(jobs[0].id);
+    } else {
+      setTargetJobForInvite(null);
+      setInviteJobId('');
+    }
+    setShowInviteCandidateModal(true);
+  };
+
+  const handleCreateCandidateInvite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setInviteError(null);
+
+    if (!inviteFirstName.trim() || !inviteLastName.trim() || !inviteEmail.trim()) {
+      setInviteError('First Name, Last Name, and Email are required.');
+      return;
+    }
+
+    const assignedJobId = inviteJobId || targetJobForInvite?.id || (jobs.length > 0 ? jobs[0].id : '');
+    if (!assignedJobId) {
+      setInviteError('Please select a valid Job Opening.');
+      return;
+    }
+
+    const assignedJob = jobs.find(j => j.id === assignedJobId) || targetJobForInvite || jobs[0];
+    const companyId = currentCompany?.id || assignedJob?.companyId || 'comp_cyberdyne';
+
+    setInviteSubmitting(true);
+    const cleanFirstName = inviteFirstName.trim();
+    const cleanLastName = inviteLastName.trim();
+    const cleanEmail = inviteEmail.trim().toLowerCase();
+    const token = `TOKEN_${cleanFirstName.toUpperCase().replace(/[^A-Z]/g, '') || 'CAND'}_${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+    const candidateId = `cand_${Date.now()}`;
+
+    const newCandidate: Candidate = {
+      id: candidateId,
+      companyId,
+      jobId: assignedJobId,
+      firstName: cleanFirstName,
+      lastName: cleanLastName,
+      email: cleanEmail,
+      phone: invitePhone.trim() || '',
+      skillCategory: inviteSkillCategory,
+      yearsOfExperience: Number(inviteExperience) || 0,
+      status: 'INVITED',
+      interviewToken: token,
+      appliedAt: new Date().toISOString(),
+      resumeFileName: `${cleanFirstName}_${cleanLastName}_CV.pdf`,
+    };
+
+    // Save candidate locally
+    const allCands = AppDataStore.getCandidates();
+    AppDataStore.saveCandidates([newCandidate, ...allCands]);
+
+    // Update job applicants count
+    const updatedJobs = jobs.map(j => j.id === assignedJobId ? { ...j, totalApplicants: (j.totalApplicants || 0) + 1 } : j);
+    AppDataStore.saveJobs(updatedJobs);
+    setJobs(updatedJobs);
+
+    // Call backend API if running
+    try {
+      await ApiClient.applyForJob({
+        first_name: newCandidate.firstName,
+        last_name: newCandidate.lastName,
+        email: newCandidate.email,
+        phone: newCandidate.phone,
+        job_id: assignedJobId,
+        skill_category: newCandidate.skillCategory,
+        years_of_experience: newCandidate.yearsOfExperience,
+        skills: assignedJob?.requiredSkills || [],
+      });
+    } catch {
+      // Offline-first datastore already secured
+    }
+
+    // Log activity
+    AppDataStore.logActivity({
+      companyId,
+      actorId: 'usr_recruiter',
+      actorName: 'Recruiter Lead',
+      actorRole: 'RECRUITER',
+      action: 'INTERVIEW_INVITATION_SENT',
+      resource: `Candidate: ${newCandidate.firstName} ${newCandidate.lastName}`,
+      details: `Generated single-use magic token: ${token} for position ${assignedJob?.title || assignedJobId}`,
+      ipAddress: '127.0.0.1',
+      severity: 'INFO',
+    });
+
+    setInviteSubmitting(false);
+    setShowInviteCandidateModal(false);
+
+    const magicLink = `${window.location.origin}/?token=${token}`;
+    setCreatedInviteResult({
+      candidate: newCandidate,
+      link: magicLink,
+      jobTitle: assignedJob?.title || 'Open Position',
+    });
+  };
+
+  const handleCopyInviteLink = async (text: string) => {
+    const ok = await copyToClipboard(text);
+    if (ok) {
+      setCopiedLinkState(true);
+      setTimeout(() => setCopiedLinkState(false), 2500);
+    }
   };
 
   // Job Publish Validation
@@ -358,13 +505,24 @@ export const JobManager: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 px-5 py-3 rounded-2xl font-bold text-xs bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white shadow-xl shadow-cyan-500/20 transition-all active:scale-95"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Create New Job</span>
-        </button>
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => handleOpenInviteModal(null)}
+            className="flex items-center gap-2 px-4 py-3 rounded-2xl font-bold text-xs bg-slate-900 hover:bg-slate-850 border border-cyan-700/60 hover:border-cyan-500 text-cyan-300 shadow-lg shadow-cyan-950/40 transition-all active:scale-95"
+            title="Invite a new candidate to any open job position"
+          >
+            <UserPlus className="w-4 h-4 text-cyan-400" />
+            <span>Invite Candidate</span>
+          </button>
+
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-2 px-5 py-3 rounded-2xl font-bold text-xs bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white shadow-xl shadow-cyan-500/20 transition-all active:scale-95"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Create New Job</span>
+          </button>
+        </div>
       </div>
 
       {/* Alerts */}
@@ -475,13 +633,26 @@ export const JobManager: React.FC = () => {
                     )}
                   </div>
 
-                  <button
-                    onClick={() => setSelectedJobForQuestions(job)}
-                    className="w-full py-2 rounded-xl bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-800 text-cyan-300 text-xs font-bold transition-all flex items-center justify-center gap-1.5"
-                  >
-                    <Sliders className="w-3.5 h-3.5" />
-                    <span>Manage Questions & Answers</span>
-                  </button>
+                  {/* Action Buttons: Questions & Invite Candidate */}
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <button
+                      onClick={() => setSelectedJobForQuestions(job)}
+                      className="py-2 px-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-cyan-800 text-cyan-300 text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+                      title="Manage Predefined Questions & Benchmark Answers"
+                    >
+                      <Sliders className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Questions</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleOpenInviteModal(job)}
+                      className="py-2 px-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white text-xs font-bold shadow-md shadow-cyan-500/20 transition-all flex items-center justify-center gap-1.5 active:scale-95"
+                      title={`Invite Candidate to ${job.title}`}
+                    >
+                      <UserPlus className="w-3.5 h-3.5" />
+                      <span>Invite Candidate</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Skills Tags */}
@@ -952,6 +1123,255 @@ export const JobManager: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* INVITE CANDIDATE TO JOB MODAL */}
+      {showInviteCandidateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
+          <div className="w-full max-w-lg bg-slate-900 border border-slate-700 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-5 animate-in zoom-in-95">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="space-y-1">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-cyan-950 border border-cyan-800 text-cyan-400 text-[10px] font-bold uppercase tracking-wider">
+                  <UserPlus className="w-3 h-3" />
+                  <span>Interview Invitation</span>
+                </div>
+                <h2 className="text-xl font-black text-white">Invite Candidate to Job</h2>
+                <p className="text-xs text-slate-400">
+                  Generate a unique, single-use AI interview token and magic link for this position.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowInviteCandidateModal(false)}
+                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {inviteError && (
+              <div className="p-3 rounded-xl bg-rose-950/80 border border-rose-800 text-rose-200 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                <span>{inviteError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleCreateCandidateInvite} className="space-y-4">
+              {/* Job Selection */}
+              <div>
+                <label className="text-xs font-bold text-slate-300 block mb-1">Target Job Position *</label>
+                <select
+                  value={inviteJobId}
+                  onChange={(e) => {
+                    setInviteJobId(e.target.value);
+                    const found = jobs.find(j => j.id === e.target.value);
+                    if (found) setTargetJobForInvite(found);
+                  }}
+                  required
+                  className="w-full text-xs p-3 rounded-xl bg-slate-950 border border-slate-800 focus:border-cyan-500 text-slate-200 outline-none"
+                >
+                  {jobs.map((j) => (
+                    <option key={j.id} value={j.id}>
+                      {j.title} • {j.department} ({j.type})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">First Name *</label>
+                  <input
+                    required
+                    value={inviteFirstName}
+                    onChange={(e) => setInviteFirstName(e.target.value)}
+                    placeholder="e.g. Arjun"
+                    className="w-full text-xs p-3 rounded-xl bg-slate-950 border border-slate-800 focus:border-cyan-500 text-slate-200 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">Last Name *</label>
+                  <input
+                    required
+                    value={inviteLastName}
+                    onChange={(e) => setInviteLastName(e.target.value)}
+                    placeholder="e.g. Sharma"
+                    className="w-full text-xs p-3 rounded-xl bg-slate-950 border border-slate-800 focus:border-cyan-500 text-slate-200 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-300 block mb-1">Candidate Email Address *</label>
+                <input
+                  required
+                  type="email"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  placeholder="arjun.sharma@example.com"
+                  className="w-full text-xs p-3 rounded-xl bg-slate-950 border border-slate-800 focus:border-cyan-500 text-slate-200 outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">Phone Number</label>
+                  <input
+                    value={invitePhone}
+                    onChange={(e) => setInvitePhone(e.target.value)}
+                    placeholder="+91 98765 43210"
+                    className="w-full text-xs p-3 rounded-xl bg-slate-950 border border-slate-800 focus:border-cyan-500 text-slate-200 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">Experience (Years)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="40"
+                    value={inviteExperience}
+                    onChange={(e) => setInviteExperience(Number(e.target.value))}
+                    className="w-full text-xs p-3 rounded-xl bg-slate-950 border border-slate-800 focus:border-cyan-500 text-slate-200 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-300 block mb-1">Role Classification</label>
+                <select
+                  value={inviteSkillCategory}
+                  onChange={(e) => setInviteSkillCategory(e.target.value as any)}
+                  className="w-full text-xs p-3 rounded-xl bg-slate-950 border border-slate-800 focus:border-cyan-500 text-slate-200 outline-none"
+                >
+                  <option value="SKILLED">Skilled Technical (Autonomous Questions + Code)</option>
+                  <option value="SEMI_SKILLED">Semi-Skilled / Technician (Practical Evaluation)</option>
+                  <option value="UNSKILLED">Workforce / Entry Level (Conversational Verification)</option>
+                </select>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowInviteCandidateModal(false)}
+                  className="px-4 py-2.5 text-xs font-semibold rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={inviteSubmitting}
+                  className="flex items-center gap-2 px-6 py-2.5 text-xs font-bold rounded-xl bg-gradient-to-r from-cyan-500 via-teal-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white shadow-lg shadow-cyan-500/25 transition-all disabled:opacity-50 active:scale-95"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>{inviteSubmitting ? 'Generating Invite...' : 'Generate & Send Invitation'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* INVITE CREATED SUCCESS DIALOG */}
+      {createdInviteResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in">
+          <div className="w-full max-w-lg bg-slate-900 border border-emerald-500/40 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-5 animate-in zoom-in-95">
+            <div className="text-center space-y-2">
+              <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/10">
+                <CheckCircle2 className="w-8 h-8" />
+              </div>
+              <h2 className="text-2xl font-black text-white">Candidate Successfully Invited!</h2>
+              <p className="text-xs text-slate-400">
+                The interview invitation token and direct access magic link are active and ready.
+              </p>
+            </div>
+
+            {/* Candidate & Job Summary Card */}
+            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+              <div className="flex items-center justify-between text-xs pb-2 border-b border-slate-800/80">
+                <span className="text-slate-400 font-semibold">Candidate:</span>
+                <span className="font-bold text-white">
+                  {createdInviteResult.candidate.firstName} {createdInviteResult.candidate.lastName}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-xs pb-2 border-b border-slate-800/80">
+                <span className="text-slate-400 font-semibold">Email:</span>
+                <span className="font-mono text-cyan-300">{createdInviteResult.candidate.email}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs pb-2 border-b border-slate-800/80">
+                <span className="text-slate-400 font-semibold">Target Position:</span>
+                <span className="font-bold text-indigo-300">{createdInviteResult.jobTitle}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs pt-1">
+                <span className="text-slate-400 font-semibold">Interview Token:</span>
+                <span className="font-mono font-bold text-amber-400 bg-amber-950/80 px-2 py-0.5 rounded border border-amber-800/60">
+                  {createdInviteResult.candidate.interviewToken}
+                </span>
+              </div>
+            </div>
+
+            {/* Magic Link Box */}
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                Direct Candidate Chamber URL
+              </label>
+              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-950 border border-cyan-900/60 text-xs">
+                <input
+                  readOnly
+                  value={createdInviteResult.link}
+                  className="flex-1 bg-transparent font-mono text-cyan-300 outline-none truncate text-[11px]"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleCopyInviteLink(createdInviteResult.link)}
+                  className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    copiedLinkState
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-md shadow-cyan-600/20'
+                  }`}
+                >
+                  {copiedLinkState ? (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>Copy Link</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
+              {onLaunchLiveInterview && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const cand = createdInviteResult.candidate;
+                    setCreatedInviteResult(null);
+                    onLaunchLiveInterview(cand);
+                  }}
+                  className="w-full sm:flex-1 py-3 rounded-xl font-bold text-xs bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-lg shadow-emerald-600/20 transition-all flex items-center justify-center gap-2"
+                >
+                  <Play className="w-4 h-4" />
+                  <span>Launch Candidate Chamber Now</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setCreatedInviteResult(null)}
+                className="w-full sm:w-auto px-6 py-3 rounded-xl font-bold text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 transition-all"
+              >
+                Done
+              </button>
+            </div>
           </div>
         </div>
       )}

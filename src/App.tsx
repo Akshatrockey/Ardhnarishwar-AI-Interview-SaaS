@@ -126,9 +126,20 @@ const AppContent: React.FC = () => {
     return (
       <RoleGuard allowedRoles={['SUPER_ADMIN']}>
         <SuperAdminPortal
-          onSwitchToCandidate={() => {}}
-          onSwitchToCompany={() => {}}
-          onSwitchToStaff={() => {}}
+          onSwitchToCandidate={() => {
+            const cands = AppDataStore.getCandidates();
+            if (cands.length > 0) {
+              setCandidateTokenForChamber(cands[0].interviewToken);
+            }
+          }}
+          onSwitchToCompany={() => {
+            const ca = AppDataStore.getUsers().find(u => u.role === 'COMPANY_ADMIN');
+            if (ca) switchPersona(ca.id);
+          }}
+          onSwitchToStaff={() => {
+            const emp = AppDataStore.getUsers().find(u => u.role === 'EMPLOYEE');
+            if (emp) switchPersona(emp.id);
+          }}
           onLogout={handleLogout}
           onOpenLandingPage={() => setShowLandingPage(true)}
         />
@@ -141,9 +152,17 @@ const AppContent: React.FC = () => {
     return (
       <RoleGuard allowedRoles={['EMPLOYEE', 'SUPER_ADMIN']}>
         <EmployeePortal
-          onSwitchToSuperAdmin={() => {}}
-          onSwitchToCompany={() => {}}
-          onSwitchToCandidate={() => {}}
+          onSwitchToSuperAdmin={() => switchPersona('usr_super_admin')}
+          onSwitchToCompany={() => {
+            const ca = AppDataStore.getUsers().find(u => u.role === 'COMPANY_ADMIN');
+            if (ca) switchPersona(ca.id);
+          }}
+          onSwitchToCandidate={() => {
+            const cands = AppDataStore.getCandidates();
+            if (cands.length > 0) {
+              setCandidateTokenForChamber(cands[0].interviewToken);
+            }
+          }}
           onLogout={handleLogout}
         />
       </RoleGuard>
@@ -166,9 +185,23 @@ const AppContent: React.FC = () => {
   return (
     <RoleGuard allowedRoles={['COMPANY_ADMIN', 'RECRUITER', 'SUPER_ADMIN']}>
       <CompanyAdminPortal
-        onSwitchToSuperAdmin={() => {}}
-        onSwitchToStaff={() => {}}
-        onSwitchToCandidate={() => {}}
+        onSwitchToSuperAdmin={() => switchPersona('usr_super_admin')}
+        onSwitchToStaff={() => {
+          const emp = AppDataStore.getUsers().find(u => u.role === 'EMPLOYEE');
+          if (emp) switchPersona(emp.id);
+        }}
+        onSwitchToCandidate={(target?: Candidate | string) => {
+          if (typeof target === 'string') {
+            setCandidateTokenForChamber(target);
+          } else if (target && target.interviewToken) {
+            setCandidateTokenForChamber(target.interviewToken);
+          } else {
+            const cands = AppDataStore.getCandidates();
+            if (cands.length > 0) {
+              setCandidateTokenForChamber(cands[0].interviewToken);
+            }
+          }
+        }}
         onLogout={handleLogout}
         onOpenLandingPage={() => setShowLandingPage(true)}
       />

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy import desc, or_
 from typing import List, Optional, Dict, Any
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..core.database import get_db
 from ..core.security import (
@@ -147,7 +147,7 @@ async def create_job_endpoint(
         required_skills=req.required_skills or [],
         status=req.status or "OPEN",
         total_applicants=0,
-        created_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc)
     )
     db.add(new_job)
     db.flush()
@@ -164,7 +164,7 @@ async def create_job_endpoint(
         time_limit_minutes=25,
         passing_score=70.0,
         proctoring_strictness="MILITARY_GRADE",
-        created_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc)
     )
     db.add(primary_round)
     db.commit()
@@ -359,7 +359,7 @@ async def add_job_question_endpoint(
             time_limit_minutes=20,
             passing_score=70.0,
             proctoring_strictness="MILITARY_GRADE",
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
         db.add(primary_round)
         db.flush()
@@ -382,7 +382,7 @@ async def add_job_question_endpoint(
         anti_patterns=req.anti_patterns or [],
         rubric_weights=req.rubric_weights or {"technical": 0.45, "relevance": 0.3, "communication": 0.25},
         is_global=False,
-        created_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc)
     )
     db.add(new_q)
     db.flush()

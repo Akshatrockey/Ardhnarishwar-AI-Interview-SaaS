@@ -10,7 +10,7 @@ from sqlalchemy import desc, or_
 from typing import List, Optional, Dict, Any
 import uuid
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..core.database import get_db
 from ..core.security import (
@@ -96,7 +96,7 @@ async def apply_for_job_endpoint(req: CandidateApplyRequest, db: Session = Depen
         status="SHORTLISTED",
         interview_token=token,
         resume_file_url=resume_url,
-        applied_at=datetime.utcnow()
+        applied_at=datetime.now(timezone.utc)
     )
     db.add(new_cand)
 

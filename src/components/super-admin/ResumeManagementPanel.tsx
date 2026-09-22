@@ -117,7 +117,8 @@ export const ResumeManagementPanel: React.FC = () => {
     }
   };
 
-  const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || '';
+  const API_BASE_URL: string =
+    (import.meta as unknown as { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL || '';
 
   return (
     <div className="space-y-6">

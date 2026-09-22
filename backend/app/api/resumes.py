@@ -12,7 +12,7 @@ import os
 import uuid
 import time
 import mimetypes
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..core.database import get_db
 from ..core.config import settings
@@ -101,7 +101,7 @@ async def upload_resume_endpoint(
         file_size_bytes=file_size,
         file_type=resolved_mime,
         status="ACTIVE",
-        uploaded_at=datetime.utcnow()
+        uploaded_at=datetime.now(timezone.utc)
     )
     db.add(new_resume)
 

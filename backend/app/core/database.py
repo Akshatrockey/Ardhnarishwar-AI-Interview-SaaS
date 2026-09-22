@@ -1,39 +1,91 @@
 """
 Ardhnarishwar SaaS - SQLAlchemy Engine & Session Factory
 Handles database engine creation, connection pooling, session lifecycle, and base declarations.
+Fully configured for MySQL 8.0+ with utf8mb4 collation and automated database provisioning.
 """
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
-from typing import Generator
+from typing import Generator, Optional
 import logging
 from .config import settings
 
 logger = logging.getLogger(__name__)
 
-def get_engine(database_url: str = None, echo: bool = False):
+def ensure_database_exists(server_url: Optional[str] = None, database_name: Optional[str] = None) -> bool:
+    """
+    Attempts to connect to the MySQL server and execute CREATE DATABASE IF NOT EXISTS.
+    Returns True if successful, False if server is unreachable.
+    """
+    srv_url = server_url or settings.get_mysql_server_url()
+    db_name = database_name or settings.MYSQL_DATABASE
+
+    if not srv_url:
+        return False
+
+    try:
+        temp_engine = create_engine(srv_url, isolation_level="AUTOCOMMIT")
+        with temp_engine.connect() as conn:
+            conn.execute(
+                text(
+                    f"CREATE DATABASE IF NOT EXISTS `{db_name}` "
+                    f"CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+                )
+            )
+        temp_engine.dispose()
+        logger.info(f"[DATABASE] Verified / Created MySQL database '{db_name}' successfully.")
+        return True
+    except Exception as err:
+        logger.warning(f"[DATABASE] Could not auto-create MySQL database '{db_name}': {err}")
+        return False
+
+def get_engine(database_url: Optional[str] = None, echo: bool = False):
     """
     Constructs an optimized SQLAlchemy engine with connection pooling and MySQL keep-alive.
+    If MySQL server is unreachable and in development mode, automatically falls back to SQLite.
     """
     url = database_url or settings.get_database_url()
-    
+
     if url.startswith("sqlite"):
-        # SQLite configuration for local testing
         return create_engine(
             url,
             connect_args={"check_same_thread": False},
             echo=echo or settings.DB_ECHO_SQL
         )
-    
-    # Production MySQL Engine with connection pooling
-    return create_engine(
-        url,
-        pool_size=settings.DB_POOL_SIZE,
-        max_overflow=settings.DB_MAX_OVERFLOW,
-        pool_timeout=settings.DB_POOL_TIMEOUT,
-        pool_recycle=settings.DB_POOL_RECYCLE,
-        pool_pre_ping=True,  # Tests connection liveness before checking out of pool
-        echo=echo or settings.DB_ECHO_SQL
-    )
+
+    # Check MySQL server liveness before pool creation
+    if "mysql" in url:
+        server_ok = ensure_database_exists()
+        if not server_ok and settings.ENVIRONMENT in ("development", "test", "dev"):
+            logger.warning(
+                "[DATABASE] MySQL server is offline or unreachable on configured port. "
+                "Resiliently falling back to local SQLite database (ardhnarishwar_local.db)."
+            )
+            return create_engine(
+                settings.SQLITE_TEST_URL,
+                connect_args={"check_same_thread": False},
+                echo=echo or settings.DB_ECHO_SQL
+            )
+
+    # Production MySQL Engine with enterprise connection pooling
+    try:
+        return create_engine(
+            url,
+            pool_size=settings.DB_POOL_SIZE,
+            max_overflow=settings.DB_MAX_OVERFLOW,
+            pool_timeout=settings.DB_POOL_TIMEOUT,
+            pool_recycle=settings.DB_POOL_RECYCLE,
+            pool_pre_ping=True,  # Tests connection liveness before checking out of pool
+            echo=echo or settings.DB_ECHO_SQL
+        )
+    except Exception as e:
+        if settings.ENVIRONMENT in ("development", "test", "dev"):
+            logger.warning(f"[DATABASE] MySQL engine creation failed: {e}. Falling back to SQLite.")
+            return create_engine(
+                settings.SQLITE_TEST_URL,
+                connect_args={"check_same_thread": False},
+                echo=echo or settings.DB_ECHO_SQL
+            )
+        raise
 
 # Primary Engine Instance
 engine = get_engine()

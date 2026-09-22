@@ -21,6 +21,17 @@ This guide covers running **Ardhnarishwar AI Interview SaaS** in local developme
 
 ## 2. Running Locally (Development Mode)
 
+### Step 0: Database Provisioning (MySQL 8.0)
+Ensure MySQL is running (via local service or Docker `docker compose up -d mysql_db`), then initialize the database and tables:
+```bash
+# 1-Click Batch (Windows):
+INIT_MYSQL.bat
+
+# Or direct Python command:
+backend\.venv\Scripts\python.exe backend\init_mysql.py
+```
+*Note: In development mode, if local MySQL service is offline, the backend automatically falls back to an isolated SQLite file (`ardhnarishwar_local.db`) so developers can continue without blocking.*
+
 ### Step 1: Frontend Dev Server
 ```bash
 npm install
