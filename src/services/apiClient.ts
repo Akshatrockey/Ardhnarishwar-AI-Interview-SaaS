@@ -379,4 +379,58 @@ export class ApiClient {
   static async deleteCompany(companyId: string) {
     return this.delete(`/api/v1/companies/${companyId}`);
   }
+
+  /**
+   * Retrieves full organizational profile and workspace settings for a company.
+   */
+  static async getCompany(companyId: string) {
+    return this.get(`/api/v1/companies/${companyId}`);
+  }
+
+  /**
+   * Persists comprehensive organization profile metadata and workspace parameters.
+   */
+  static async updateCompanySettings(companyId: string, data: any) {
+    return this.put(`/api/v1/companies/${companyId}`, data);
+  }
+
+  // ============================================================================
+  // High-Level Domain Methods: Multi-Engine AI Co-Pilot & Video Vault
+  // ============================================================================
+
+  /**
+   * Lists available multi-engine AI models (Claude, Gemini, HuggingFace, Local).
+   */
+  static async getAiModels() {
+    return this.get('/api/v1/ai/models');
+  }
+
+  /**
+   * Sends prompt to Multi-Engine Co-pilot with automatic fallback cascade.
+   */
+  static async sendCopilotMessage(payload: {
+    prompt: string;
+    mode?: string;
+    model_id?: string;
+    stream?: boolean;
+    history?: any[];
+    company_name?: string;
+  }) {
+    return this.post('/api/v1/ai/copilot/chat', payload);
+  }
+
+  /**
+   * Triggers or indexes an interview recording into the AI Video Vault.
+   */
+  static async indexVideoVault(sessionId: string) {
+    return this.post(`/api/v1/recordings/${sessionId}/index-vault`);
+  }
+
+  /**
+   * Retrieves key moments, transcription, and behavioral highlights from the AI Video Vault.
+   */
+  static async getVideoVaultData(sessionId: string) {
+    return this.get(`/api/v1/recordings/${sessionId}/vault-data`);
+  }
 }
+

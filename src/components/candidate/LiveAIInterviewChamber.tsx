@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Question, Candidate, JobPosition, InterviewRound, CandidateAnswer, InterviewSession, ISpeechRecognitionConstructor, ISpeechRecognitionEvent } from '../../types';
 import { evaluateCandidateAnswer, compileSessionEvaluationReport } from '../../ai-engine/scoringPipeline';
 import { AppDataStore, saveVideoBlob } from '../../services/storage';
+import { RecordingService } from '../../services/recordingService';
+import { ApiClient } from '../../services/apiClient';
 import { useLanguage } from '../../context/LanguageContext';
 import { useRealtime } from '../../context/RealtimeContext';
 import { 
@@ -114,7 +116,18 @@ export const LiveAIInterviewChamber: React.FC<LiveAIInterviewChamberProps> = ({
 
     initMedia();
 
+    const handleBeforeUnload = () => {
+      if (recordedChunksRef.current.length > 0) {
+        try {
+          const emergencyBlob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+          saveVideoBlob(activeSessionId, emergencyBlob);
+        } catch {}
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
     return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
       if (stream) {
         stream.getTracks().forEach(t => t.stop());
       }
@@ -122,7 +135,7 @@ export const LiveAIInterviewChamber: React.FC<LiveAIInterviewChamberProps> = ({
         mediaRecorderRef.current.stop();
       }
     };
-  }, []);
+  }, [activeSessionId]);
 
   // 2. Setup Multilingual Speech Recognition
   useEffect(() => {
@@ -322,10 +335,23 @@ export const LiveAIInterviewChamber: React.FC<LiveAIInterviewChamberProps> = ({
     const totalDurationSeconds = Math.round((Date.now() - sessionStartTime) / 1000);
     const sessionId = activeSessionId;
 
-    // Save recorded video blob to IndexedDB
+    // Save recorded video blob to IndexedDB & Upload to Backend Vault
     if (recordedChunksRef.current.length > 0) {
       const fullBlob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
       await saveVideoBlob(sessionId, fullBlob);
+
+      // Asynchronously upload to backend storage vault & auto-index
+      try {
+        await RecordingService.uploadRecording(
+          sessionId,
+          fullBlob,
+          candidate.interviewToken || 'TOKEN_DEMO',
+          totalDurationSeconds
+        );
+        await ApiClient.indexVideoVault(sessionId);
+      } catch (uploadErr) {
+        console.warn('Backend video upload/indexing deferred to offline client cache:', uploadErr);
+      }
     }
 
     // Compile comprehensive AI evaluation report with Predefined Answers & Passing Criteria

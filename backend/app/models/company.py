@@ -1,7 +1,7 @@
 """
 SQLAlchemy ORM Models: Company & Subscription
 """
-from sqlalchemy import Column, String, Integer, Boolean, DateTime, Enum, ForeignKey, Numeric, Text, Index
+from sqlalchemy import Column, String, Integer, Boolean, DateTime, Enum, ForeignKey, Numeric, Text, Index, JSON
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from ..core.database import Base
@@ -14,6 +14,30 @@ class Company(Base):
     slug = Column(String(100), nullable=False, unique=True)
     domain = Column(String(255), nullable=False, unique=True)
     logo_url = Column(Text, nullable=True)
+    legal_name = Column(String(255), nullable=True)
+    display_name = Column(String(255), nullable=True)
+    favicon_url = Column(Text, nullable=True)
+    brand_accent_color = Column(String(32), nullable=True, default='#06B6D4')
+    website = Column(String(255), nullable=True)
+    tax_id = Column(String(100), nullable=True)  # CIN / GSTIN / Tax ID
+    company_size = Column(String(50), nullable=True, default='51-200 employees')
+    description = Column(Text, nullable=True)
+    hq_street = Column(String(255), nullable=True)
+    hq_city = Column(String(100), nullable=True)
+    hq_state = Column(String(100), nullable=True)
+    hq_country = Column(String(100), nullable=True)
+    hq_postal_code = Column(String(50), nullable=True)
+    phone = Column(String(50), nullable=True)
+    support_email = Column(String(255), nullable=True)
+    timezone = Column(String(100), nullable=True, default='UTC')
+    currency = Column(String(20), nullable=True, default='USD')
+    date_format = Column(String(50), nullable=True, default='YYYY-MM-DD')
+    work_week = Column(String(100), nullable=True, default='Monday - Friday')
+    social_links = Column(JSON, nullable=True)
+    data_retention_days = Column(Integer, nullable=True, default=365)
+    default_permissions = Column(JSON, nullable=True)
+    security_contact_email = Column(String(255), nullable=True)
+    settings_metadata = Column(JSON, nullable=True)
     plan_tier = Column(Enum('STARTER', 'GROWTH', 'ENTERPRISE_ROBOTICS', name='company_plan_enum'), nullable=False, default='GROWTH')
     status = Column(Enum('ACTIVE', 'INACTIVE', 'TRIAL', 'SUSPENDED', name='company_status_enum'), nullable=False, default='ACTIVE')
     max_jobs = Column(Integer, nullable=False, default=20)

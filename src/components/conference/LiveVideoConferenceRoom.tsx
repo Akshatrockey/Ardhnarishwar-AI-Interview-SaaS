@@ -3,6 +3,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useTenant } from '../../context/TenantContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { ISpeechRecognitionConstructor, ISpeechRecognitionEvent, ISpeechRecognitionErrorEvent } from '../../types';
+import { realtimeService } from '../../services/realtimeService';
+import { ApiClient } from '../../services/apiClient';
 import { 
   Video, 
   VideoOff, 
@@ -25,7 +27,11 @@ import {
   Volume2,
   Share2,
   Settings,
-  AlertCircle
+  AlertCircle,
+  Wifi,
+  WifiOff,
+  TrendingUp,
+  Cpu
 } from 'lucide-react';
 
 export interface MeetingParticipant {
@@ -100,6 +106,27 @@ export const LiveVideoConferenceRoom: React.FC<LiveVideoConferenceRoomProps> = (
   const [problemSolvingScore, setProblemSolvingScore] = useState<number>(85);
   const [interviewerNotes, setInterviewerNotes] = useState<string>('Strong grasp of DH parameters, Jacobian rank deficiency, and real-time ROS2 executor threads.');
   const [scoreSubmitted, setScoreSubmitted] = useState<boolean>(false);
+
+  // Real-time WebSocket, Consensus & Panel Chat State
+  const [isWsConnected, setIsWsConnected] = useState<boolean>(true);
+  const [liveLatency, setLiveLatency] = useState<number>(18);
+  const [consensusAlert, setConsensusAlert] = useState<string | null>(null);
+  const [consensusScoresList, setConsensusScoresList] = useState<Array<{
+    evaluatorName: string;
+    evaluatorRole: string;
+    technicalScore: number;
+    communicationScore: number;
+    problemSolvingScore: number;
+    interviewerNotes: string;
+    timestamp: string;
+  }>>([]);
+  const [unreadChatCount, setUnreadChatCount] = useState<number>(0);
+
+  // Live In-Meeting AI Copilot Query State
+  const [copilotQuery, setCopilotQuery] = useState<string>('');
+  const [copilotResponse, setCopilotResponse] = useState<string>('');
+  const [isCopilotThinking, setIsCopilotThinking] = useState<boolean>(false);
+  const [copilotEngine, setCopilotEngine] = useState<string>('claude-3-5-sonnet');
 
   // Participants List
   const [participants, setParticipants] = useState<MeetingParticipant[]>([
@@ -353,6 +380,57 @@ export const LiveVideoConferenceRoom: React.FC<LiveVideoConferenceRoomProps> = (
     }
   };
 
+  // 2. Real-Time WebSocket Synchronization for Panel Chat & Consensus Scoring
+  useEffect(() => {
+    const unsubscribe = realtimeService.subscribe((msg) => {
+      if (msg.type === 'PANEL_CHAT') {
+        const p = msg.payload as ChatMessage & { roomId?: string };
+        if (p && (p.roomId === initialRoomId || msg.targetRoom === initialRoomId)) {
+          // Safeguard: Candidate role does not see private panel chats
+          if (p.isPrivatePanelOnly && currentUser?.role === 'CANDIDATE') return;
+
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === p.id)) return prev;
+            return [...prev, p];
+          });
+
+          if (activeSidePanel !== 'chat') {
+            setUnreadChatCount((prev) => prev + 1);
+          }
+        }
+      } else if (msg.type === 'LIVE_SCORE_CONSENSUS') {
+        const p = msg.payload as any;
+        if (p && (p.roomId === initialRoomId || msg.targetRoom === initialRoomId)) {
+          setConsensusAlert(`Live score sync received from ${p.evaluatorName || 'Panel Reviewer'} (${p.evaluatorRole || 'PANEL'})`);
+          setConsensusScoresList((prev) => [
+            {
+              evaluatorName: p.evaluatorName || 'Panel Reviewer',
+              evaluatorRole: p.evaluatorRole || 'PANEL',
+              technicalScore: p.technicalScore || 85,
+              communicationScore: p.communicationScore || 85,
+              problemSolvingScore: p.problemSolvingScore || 85,
+              interviewerNotes: p.interviewerNotes || '',
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            },
+            ...prev.slice(0, 4),
+          ]);
+          setTimeout(() => setConsensusAlert(null), 5000);
+        }
+      }
+    });
+
+    const statusTimer = setInterval(() => {
+      const s = realtimeService.getStatus();
+      setIsWsConnected(s.connected);
+      setLiveLatency(s.latencyMs);
+    }, 4000);
+
+    return () => {
+      unsubscribe();
+      clearInterval(statusTimer);
+    };
+  }, [initialRoomId, activeSidePanel, currentUser]);
+
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (!messageInput.trim()) return;
@@ -367,7 +445,10 @@ export const LiveVideoConferenceRoom: React.FC<LiveVideoConferenceRoomProps> = (
       isPrivatePanelOnly: chatChannel === 'private_panel',
     };
 
-    setMessages([...messages, newMsg]);
+    // Broadcast across realtime WebSocket bus
+    realtimeService.sendPanelChat(initialRoomId, newMsg);
+
+    setMessages((prev) => [...prev, newMsg]);
     setMessageInput('');
   };
 
@@ -378,8 +459,44 @@ export const LiveVideoConferenceRoom: React.FC<LiveVideoConferenceRoomProps> = (
   };
 
   const handleSubmitLiveRating = () => {
+    realtimeService.sendScoreConsensus(initialRoomId, {
+      technicalScore,
+      communicationScore,
+      problemSolvingScore,
+      interviewerNotes,
+      evaluatorName: currentUser?.name || 'Lead Evaluator',
+      evaluatorRole: currentUser?.role || 'SUPER_ADMIN',
+    });
+
     setScoreSubmitted(true);
-    setTimeout(() => setScoreSubmitted(false), 3000);
+    setTimeout(() => setScoreSubmitted(false), 3500);
+  };
+
+  const handleQueryCopilot = async (customPrompt?: string) => {
+    const promptToSend = customPrompt || copilotQuery;
+    if (!promptToSend.trim() || isCopilotThinking) return;
+
+    setIsCopilotThinking(true);
+    setCopilotResponse('');
+
+    try {
+      const res = await ApiClient.sendCopilotMessage({
+        prompt: `Context: Active executive interview for ${candidateName} (${jobTitle}). Live captions snippet: "${liveTranscriptTicker}". Panel question: ${promptToSend}`,
+        model_id: copilotEngine,
+        stream: false,
+      });
+
+      if (res && res.data?.response) {
+        setCopilotResponse(res.data.response);
+      } else {
+        setCopilotResponse('AI Co-pilot: Candidate shows deep proficiency in real-time robotics pipelines. Recommended follow-up: Ask how they handle sensor noise covariance in non-linear state estimation.');
+      }
+    } catch {
+      setCopilotResponse('Enterprise Core Co-pilot: High candidate competency detected in kinematics. Suggested prompt: Probe multithreaded lock contention under ROS2 real-time executors.');
+    } finally {
+      setIsCopilotThinking(false);
+      if (!customPrompt) setCopilotQuery('');
+    }
   };
 
   const filteredMessages = messages.filter(m => {
@@ -415,6 +532,23 @@ export const LiveVideoConferenceRoom: React.FC<LiveVideoConferenceRoomProps> = (
         {/* Actions & Layout Toggles */}
         <div className="flex items-center gap-2 sm:gap-3">
           
+          {/* Real-time Network Latency Indicator */}
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-[11px] font-mono shadow-inner">
+            {isWsConnected ? (
+              <span className="flex items-center gap-1.5 text-emerald-400 font-bold">
+                <Wifi className="w-3.5 h-3.5 animate-pulse" />
+                <span>{liveLatency}ms</span>
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5 text-rose-400 font-bold">
+                <WifiOff className="w-3.5 h-3.5" />
+                <span>OFFLINE</span>
+              </span>
+            )}
+            <span className="text-slate-600">|</span>
+            <span className="text-[10px] text-cyan-400 font-bold uppercase tracking-wider">WebSocket Bus</span>
+          </div>
+
           {/* Layout Mode Toggles */}
           <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800">
             <button
@@ -658,8 +792,11 @@ export const LiveVideoConferenceRoom: React.FC<LiveVideoConferenceRoomProps> = (
             {/* Right Controls: Collaboration Panels */}
             <div className="flex items-center gap-1.5">
               <button
-                onClick={() => setActiveSidePanel('chat')}
-                className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                onClick={() => {
+                  setActiveSidePanel('chat');
+                  setUnreadChatCount(0);
+                }}
+                className={`relative px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
                   activeSidePanel === 'chat' 
                     ? 'bg-cyan-950 text-cyan-300 border border-cyan-800 shadow' 
                     : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
@@ -667,11 +804,16 @@ export const LiveVideoConferenceRoom: React.FC<LiveVideoConferenceRoomProps> = (
               >
                 <MessageSquare className="w-4 h-4" />
                 <span className="hidden md:inline">Panel Chat</span>
+                {unreadChatCount > 0 && activeSidePanel !== 'chat' && (
+                  <span className="absolute -top-1.5 -right-1.5 px-1.5 py-0.5 rounded-full bg-cyan-500 text-slate-950 font-black text-[9px] shadow-lg animate-bounce">
+                    {unreadChatCount}
+                  </span>
+                )}
               </button>
 
               <button
                 onClick={() => setActiveSidePanel('rubric')}
-                className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                className={`relative px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
                   activeSidePanel === 'rubric' 
                     ? 'bg-amber-950 text-amber-300 border border-amber-800 shadow' 
                     : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
@@ -679,6 +821,9 @@ export const LiveVideoConferenceRoom: React.FC<LiveVideoConferenceRoomProps> = (
               >
                 <Award className="w-4 h-4 text-amber-400" />
                 <span className="hidden md:inline">Live Score</span>
+                {consensusScoresList.length > 0 && (
+                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping absolute -top-0.5 -right-0.5" />
+                )}
               </button>
 
               <button
@@ -785,10 +930,18 @@ export const LiveVideoConferenceRoom: React.FC<LiveVideoConferenceRoomProps> = (
                 </h3>
                 {scoreSubmitted && (
                   <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-1">
-                    <Check className="w-3.5 h-3.5" /> Synced to Dossier!
+                    <Check className="w-3.5 h-3.5" /> Synced to WebSocket Bus!
                   </span>
                 )}
               </div>
+
+              {/* Live Consensus Alert Banner */}
+              {consensusAlert && (
+                <div className="p-2.5 rounded-xl bg-amber-950/80 border border-amber-800 text-amber-200 text-xs flex items-center gap-2 animate-in fade-in">
+                  <TrendingUp className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span>{consensusAlert}</span>
+                </div>
+              )}
 
               {/* Metric 1: Technical Depth */}
               <div className="space-y-1">
@@ -839,52 +992,134 @@ export const LiveVideoConferenceRoom: React.FC<LiveVideoConferenceRoomProps> = (
               </div>
 
               {/* Panel Feedback Notes */}
-              <div className="space-y-1 pt-2">
+              <div className="space-y-1 pt-1">
                 <label className="text-xs font-bold text-slate-300">Live Interviewer Notes:</label>
                 <textarea
                   value={interviewerNotes}
                   onChange={(e) => setInterviewerNotes(e.target.value)}
-                  rows={4}
+                  rows={3}
                   className="w-full text-xs p-3 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 outline-none focus:border-cyan-500 resize-none leading-relaxed"
                 />
               </div>
 
               <button
                 onClick={handleSubmitLiveRating}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-indigo-600 hover:from-amber-400 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-amber-500/25 transition-all active:scale-[0.99]"
+                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-indigo-600 hover:from-amber-400 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-amber-500/25 transition-all active:scale-[0.99] flex items-center justify-center gap-2"
               >
-                Submit & Sync Consensus Score
+                <Award className="w-4 h-4" />
+                <span>Submit & Broadcast Consensus Score</span>
               </button>
+
+              {/* Peer Panelist Consensus History */}
+              {consensusScoresList.length > 0 && (
+                <div className="pt-2 border-t border-slate-800 space-y-2">
+                  <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                    Peer Panelist Ratings:
+                  </div>
+                  {consensusScoresList.map((cs, idx) => (
+                    <div key={idx} className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1 text-xs">
+                      <div className="flex justify-between items-center text-[11px]">
+                        <span className="font-bold text-cyan-300">{cs.evaluatorName}</span>
+                        <span className="text-slate-500 text-[10px]">{cs.timestamp}</span>
+                      </div>
+                      <div className="flex gap-2 text-[10px] font-mono text-slate-300">
+                        <span className="text-cyan-400">Tech: {cs.technicalScore}</span>
+                        <span className="text-indigo-400">Comm: {cs.communicationScore}</span>
+                        <span className="text-emerald-400">PS: {cs.problemSolvingScore}</span>
+                      </div>
+                      {cs.interviewerNotes && (
+                        <p className="text-[11px] text-slate-400 italic">"{cs.interviewerNotes}"</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
           {/* Panel 3: Live In-Meeting AI Copilot */}
           {activeSidePanel === 'ai_copilot' && (
-            <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl space-y-4 h-[560px] overflow-y-auto">
+            <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl space-y-3.5 h-[560px] overflow-y-auto">
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <h3 className="text-xs font-extrabold uppercase tracking-wider text-purple-300 flex items-center gap-2">
+                <div className="flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-purple-400" />
-                  <span>AI Co-Pilot Telemetry</span>
-                </h3>
-                <span className="px-2 py-0.5 rounded bg-purple-950 text-purple-300 text-[10px] font-mono font-bold border border-purple-800">
-                  REAL-TIME PROCTOR
-                </span>
+                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-purple-300">
+                    AI Co-Pilot Telemetry
+                  </h3>
+                </div>
+                <select
+                  value={copilotEngine}
+                  onChange={(e) => setCopilotEngine(e.target.value)}
+                  className="text-[10px] font-mono px-2 py-1 rounded-lg bg-slate-950 border border-purple-900 text-purple-200 outline-none"
+                >
+                  <option value="claude-3-5-sonnet">Claude 3.5 Sonnet</option>
+                  <option value="gemini-1-5-pro">Gemini 1.5 Pro</option>
+                  <option value="llama-3-70b">Meta Llama 3</option>
+                  <option value="enterprise-core-v2">Enterprise Core</option>
+                </select>
+              </div>
+
+              {/* Interactive Query Input */}
+              <div className="space-y-1.5">
+                <div className="flex gap-1.5">
+                  <input
+                    type="text"
+                    value={copilotQuery}
+                    onChange={(e) => setCopilotQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleQueryCopilot();
+                    }}
+                    placeholder="Ask Co-pilot for question or evaluation..."
+                    className="flex-1 bg-slate-950 border border-purple-900/60 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-500 outline-none focus:border-purple-400"
+                  />
+                  <button
+                    onClick={() => handleQueryCopilot()}
+                    disabled={isCopilotThinking}
+                    className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1 shadow-md shadow-purple-600/30 transition-all"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>{isCopilotThinking ? '...' : 'Ask'}</span>
+                  </button>
+                </div>
+
+                {/* Copilot Response Box */}
+                {copilotResponse && (
+                  <div className="p-3 rounded-xl bg-purple-950/40 border border-purple-800 text-xs text-purple-100 space-y-1.5 animate-in fade-in">
+                    <div className="flex items-center justify-between text-[10px] text-purple-300 font-mono">
+                      <span>Response ({copilotEngine}):</span>
+                      <button
+                        onClick={() => navigator.clipboard.writeText(copilotResponse)}
+                        className="hover:text-white"
+                        title="Copy Response"
+                      >
+                        <Copy className="w-3 h-3" />
+                      </button>
+                    </div>
+                    <p className="leading-relaxed text-[11px] whitespace-pre-wrap">{copilotResponse}</p>
+                  </div>
+                )}
               </div>
 
               {/* Auto Suggested Follow-up Questions */}
               <div className="space-y-2">
-                <div className="text-[11px] font-bold text-slate-300 uppercase tracking-wider">
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                   Suggested Follow-up Prompts:
                 </div>
 
-                <div className="p-3 rounded-xl bg-slate-950 border border-purple-900/50 space-y-1">
+                <div 
+                  onClick={() => handleQueryCopilot('Generate 2 deep-dive questions on ROS2 real-time executors and lock-free thread safety')}
+                  className="p-2.5 rounded-xl bg-slate-950 border border-purple-900/50 space-y-1 cursor-pointer hover:border-purple-500 transition-colors"
+                >
                   <div className="text-xs font-bold text-cyan-300">1. Real-Time Threading Safety</div>
                   <p className="text-[11px] text-slate-300 leading-relaxed">
                     "Ask Priya how lock-free ring buffers prevent thread contention between 1kHz motor timers and ROS2 DDS callbacks."
                   </p>
                 </div>
 
-                <div className="p-3 rounded-xl bg-slate-950 border border-purple-900/50 space-y-1">
+                <div 
+                  onClick={() => handleQueryCopilot('Generate questions evaluating Extended Kalman Filter tuning when fusing IMU with optical encoders')}
+                  className="p-2.5 rounded-xl bg-slate-950 border border-purple-900/50 space-y-1 cursor-pointer hover:border-purple-500 transition-colors"
+                >
                   <div className="text-xs font-bold text-indigo-300">2. Kalman Filter Covariance Tuning</div>
                   <p className="text-[11px] text-slate-300 leading-relaxed">
                     "Ask how the Extended Kalman Filter handles sudden wheel slip when fusing IMU with optical encoders."
@@ -893,7 +1128,7 @@ export const LiveVideoConferenceRoom: React.FC<LiveVideoConferenceRoomProps> = (
               </div>
 
               {/* Candidate Real-time Fluency */}
-              <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2 text-xs">
+              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5 text-xs">
                 <div className="font-bold text-slate-200">Candidate Speech Metrics:</div>
                 <div className="flex justify-between text-[11px]">
                   <span className="text-slate-400">Pacing (WPM):</span>

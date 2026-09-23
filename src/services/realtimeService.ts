@@ -338,6 +338,49 @@ class RealtimeClientService {
   }
 
   /**
+   * Dispatches a live video conference panel chat message (public or private whisper).
+   */
+  public sendPanelChat(roomId: string, message: {
+    id: string;
+    senderId: string;
+    senderName: string;
+    senderRole: string;
+    text: string;
+    timestamp: string;
+    isPrivatePanelOnly: boolean;
+  }): void {
+    this.send({
+      type: 'PANEL_CHAT',
+      senderId: this.currentUserId,
+      senderRole: this.currentUserRole,
+      targetRoom: roomId,
+      payload: { ...message, roomId },
+      timestamp: Date.now(),
+    });
+  }
+
+  /**
+   * Dispatches a live score consensus rating update to panelists in the conference.
+   */
+  public sendScoreConsensus(roomId: string, scoreData: {
+    technicalScore: number;
+    communicationScore: number;
+    problemSolvingScore: number;
+    interviewerNotes: string;
+    evaluatorName: string;
+    evaluatorRole: string;
+  }): void {
+    this.send({
+      type: 'LIVE_SCORE_CONSENSUS',
+      senderId: this.currentUserId,
+      senderRole: this.currentUserRole,
+      targetRoom: roomId,
+      payload: { ...scoreData, roomId },
+      timestamp: Date.now(),
+    });
+  }
+
+  /**
    * Returns current real-time network connectivity and latency metrics.
    */
   public getStatus(): RealtimeConnectionStatus {

@@ -37,9 +37,47 @@ from app.api.jobs import router as jobs_router
 from app.api.candidates import router as candidates_router
 from app.api.interviews import router as interviews_router
 from app.api.stats import router as stats_router
+from app.api.copilot import router as copilot_router
 
 # Initialize tables if not already present
 Base.metadata.create_all(bind=engine)
+
+def migrate_company_columns(db_engine):
+    """Adds newly defined organization profile columns to existing database tables if not present."""
+    from sqlalchemy import text
+    new_cols = [
+        ("legal_name", "VARCHAR(255)"),
+        ("display_name", "VARCHAR(255)"),
+        ("favicon_url", "TEXT"),
+        ("brand_accent_color", "VARCHAR(32) DEFAULT '#06B6D4'"),
+        ("website", "VARCHAR(255)"),
+        ("tax_id", "VARCHAR(100)"),
+        ("company_size", "VARCHAR(50) DEFAULT '51-200 employees'"),
+        ("description", "TEXT"),
+        ("hq_street", "VARCHAR(255)"),
+        ("hq_city", "VARCHAR(100)"),
+        ("hq_state", "VARCHAR(100)"),
+        ("hq_country", "VARCHAR(100)"),
+        ("hq_postal_code", "VARCHAR(50)"),
+        ("phone", "VARCHAR(50)"),
+        ("support_email", "VARCHAR(255)"),
+        ("timezone", "VARCHAR(100) DEFAULT 'UTC'"),
+        ("currency", "VARCHAR(20) DEFAULT 'USD'"),
+        ("date_format", "VARCHAR(50) DEFAULT 'YYYY-MM-DD'"),
+        ("work_week", "VARCHAR(100) DEFAULT 'Monday - Friday'"),
+        ("social_links", "TEXT"),
+        ("data_retention_days", "INTEGER DEFAULT 365"),
+        ("default_permissions", "TEXT"),
+        ("security_contact_email", "VARCHAR(255)"),
+        ("settings_metadata", "TEXT"),
+    ]
+    with db_engine.connect() as conn:
+        for col_name, col_type in new_cols:
+            try:
+                conn.execute(text(f"ALTER TABLE companies ADD COLUMN {col_name} {col_type}"))
+                conn.commit()
+            except Exception:
+                pass
 
 app = FastAPI(
     title="Ardhnarishwar Enterprise SaaS API",
@@ -69,19 +107,23 @@ app.include_router(jobs_router)
 app.include_router(candidates_router)
 app.include_router(interviews_router)
 app.include_router(stats_router)
+app.include_router(copilot_router)
 
 
 @app.on_event("startup")
 async def startup_bootstrap():
     """
-    Ensures storage directories exist and seeds ONLY the primary Super Admin account
+    Ensures storage directories exist, runs migrations, and seeds ONLY the primary Super Admin account
     if database is completely empty. Zero business/demo data is seeded.
     """
+    migrate_company_columns(engine)
     base_dir = os.path.dirname(__file__)
     resumes_dir = os.path.join(base_dir, "storage", "resumes")
     recordings_dir = os.path.join(base_dir, "storage", "recordings")
+    logos_dir = os.path.join(base_dir, "storage", "logos")
     os.makedirs(resumes_dir, exist_ok=True)
     os.makedirs(recordings_dir, exist_ok=True)
+    os.makedirs(logos_dir, exist_ok=True)
 
     # Secure Administrative Root Bootstrap
     from app.core.database import SessionLocal
@@ -511,6 +553,52 @@ async def register_employee_endpoint(req: EmployeeRegisterRequest, db: Session =
     return {"success": True, "employee_id": new_user.id, "name": new_user.name}
 
 
+def serialize_company_profile(c: Company) -> Dict[str, Any]:
+    return {
+        "id": c.id,
+        "name": c.name,
+        "slug": c.slug,
+        "domain": c.domain,
+        "logo_url": c.logo_url,
+        "legal_name": c.legal_name or c.name,
+        "display_name": c.display_name or c.name,
+        "favicon_url": c.favicon_url,
+        "brand_accent_color": c.brand_accent_color or "#06B6D4",
+        "website": c.website or (f"https://{c.domain}" if c.domain else ""),
+        "tax_id": c.tax_id or "",
+        "company_size": c.company_size or "51-200 employees",
+        "description": c.description or "",
+        "hq_street": c.hq_street or "",
+        "hq_city": c.hq_city or "",
+        "hq_state": c.hq_state or "",
+        "hq_country": c.hq_country or "",
+        "hq_postal_code": c.hq_postal_code or "",
+        "phone": c.phone or "",
+        "contact_email": c.contact_email,
+        "contactPerson": c.contact_person,
+        "contact_person": c.contact_person,
+        "support_email": c.support_email or c.contact_email,
+        "timezone": c.timezone or "UTC",
+        "currency": c.currency or "USD",
+        "date_format": c.date_format or "YYYY-MM-DD",
+        "work_week": c.work_week or "Monday - Friday",
+        "social_links": c.social_links or {},
+        "data_retention_days": c.data_retention_days or 365,
+        "default_permissions": c.default_permissions or {},
+        "security_contact_email": c.security_contact_email or c.contact_email,
+        "ai_custom_rules_enabled": c.ai_custom_rules_enabled,
+        "plan": c.plan_tier,
+        "plan_tier": c.plan_tier,
+        "status": c.status,
+        "maxJobs": c.max_jobs,
+        "maxCandidatesPerMonth": c.max_candidates_per_month,
+        "industry": c.industry,
+        "createdAt": c.created_at.isoformat() if c.created_at else None,
+        "created_at": c.created_at.isoformat() if c.created_at else None,
+        "updated_at": c.updated_at.isoformat() if c.updated_at else None
+    }
+
+
 # ==============================================================================
 # Companies Management (Super Admin & Company Admin)
 # ==============================================================================
@@ -527,22 +615,142 @@ async def list_companies_endpoint(
     else:
         companies = db.query(Company).filter(Company.id == current_user.company_id).all()
 
-    return [
-        {
-            "id": c.id,
-            "name": c.name,
-            "slug": c.slug,
-            "domain": c.domain,
-            "plan": c.plan_tier,
-            "status": c.status,
-            "maxJobs": c.max_jobs,
-            "maxCandidatesPerMonth": c.max_candidates_per_month,
-            "contactEmail": c.contact_email,
-            "contactPerson": c.contact_person,
-            "industry": c.industry,
-            "createdAt": c.created_at.isoformat()
-        } for c in companies
-    ]
+    return [serialize_company_profile(c) for c in companies]
+
+
+@app.get("/api/v1/companies/{company_id}", tags=["Companies"])
+async def get_company_endpoint(
+    company_id: str,
+    current_user: AuthenticatedIdentity = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Retrieves full organization profile and workspace parameters.
+    """
+    if current_user.role != "SUPER_ADMIN" and current_user.company_id != company_id:
+        raise HTTPException(status_code=403, detail="Unauthorized to access another tenant's profile.")
+
+    comp = db.query(Company).filter(Company.id == company_id).first()
+    if not comp:
+        raise HTTPException(status_code=404, detail="Company not found.")
+
+    return serialize_company_profile(comp)
+
+
+class CompanySettingsUpdate(BaseModel):
+    name: Optional[str] = None
+    legal_name: Optional[str] = None
+    display_name: Optional[str] = None
+    logo_url: Optional[str] = None
+    favicon_url: Optional[str] = None
+    brand_accent_color: Optional[str] = None
+    website: Optional[str] = None
+    tax_id: Optional[str] = None
+    company_size: Optional[str] = None
+    description: Optional[str] = None
+    hq_street: Optional[str] = None
+    hq_city: Optional[str] = None
+    hq_state: Optional[str] = None
+    hq_country: Optional[str] = None
+    hq_postal_code: Optional[str] = None
+    phone: Optional[str] = None
+    contact_email: Optional[str] = None
+    contact_person: Optional[str] = None
+    contactPerson: Optional[str] = None
+    support_email: Optional[str] = None
+    timezone: Optional[str] = None
+    currency: Optional[str] = None
+    date_format: Optional[str] = None
+    work_week: Optional[str] = None
+    social_links: Optional[Dict[str, Any]] = None
+    data_retention_days: Optional[int] = None
+    default_permissions: Optional[Dict[str, Any]] = None
+    security_contact_email: Optional[str] = None
+    ai_custom_rules_enabled: Optional[bool] = None
+    aiCustomRulesEnabled: Optional[bool] = None
+    industry: Optional[str] = None
+
+
+@app.put("/api/v1/companies/{company_id}", tags=["Companies"])
+async def update_company_settings_endpoint(
+    company_id: str,
+    req: CompanySettingsUpdate,
+    current_user: AuthenticatedIdentity = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Persists comprehensive organization settings and emits an immutable audit log entry.
+    """
+    if current_user.role != "SUPER_ADMIN" and current_user.company_id != company_id:
+        raise HTTPException(status_code=403, detail="Unauthorized to update workspace settings for another organization.")
+
+    comp = db.query(Company).filter(Company.id == company_id).first()
+    if not comp:
+        raise HTTPException(status_code=404, detail="Company not found.")
+
+    if req.name is not None and req.name.strip(): comp.name = req.name.strip()
+    if req.legal_name is not None: comp.legal_name = req.legal_name.strip()
+    if req.display_name is not None: comp.display_name = req.display_name.strip()
+    if req.logo_url is not None: comp.logo_url = req.logo_url
+    if req.favicon_url is not None: comp.favicon_url = req.favicon_url
+    if req.brand_accent_color is not None: comp.brand_accent_color = req.brand_accent_color
+    if req.website is not None: comp.website = req.website.strip()
+    if req.tax_id is not None: comp.tax_id = req.tax_id.strip()
+    if req.company_size is not None: comp.company_size = req.company_size
+    if req.description is not None: comp.description = req.description.strip()
+    if req.hq_street is not None: comp.hq_street = req.hq_street.strip()
+    if req.hq_city is not None: comp.hq_city = req.hq_city.strip()
+    if req.hq_state is not None: comp.hq_state = req.hq_state.strip()
+    if req.hq_country is not None: comp.hq_country = req.hq_country.strip()
+    if req.hq_postal_code is not None: comp.hq_postal_code = req.hq_postal_code.strip()
+    if req.phone is not None: comp.phone = req.phone.strip()
+    if req.contact_email is not None and req.contact_email.strip(): comp.contact_email = req.contact_email.strip().lower()
+    
+    cp = req.contact_person or req.contactPerson
+    if cp is not None and cp.strip(): comp.contact_person = cp.strip()
+    
+    if req.support_email is not None: comp.support_email = req.support_email.strip().lower()
+    if req.timezone is not None: comp.timezone = req.timezone
+    if req.currency is not None: comp.currency = req.currency
+    if req.date_format is not None: comp.date_format = req.date_format
+    if req.work_week is not None: comp.work_week = req.work_week
+    if req.social_links is not None: comp.social_links = req.social_links
+    if req.data_retention_days is not None: comp.data_retention_days = req.data_retention_days
+    if req.default_permissions is not None: comp.default_permissions = req.default_permissions
+    if req.security_contact_email is not None: comp.security_contact_email = req.security_contact_email.strip().lower()
+    
+    custom_rules = req.ai_custom_rules_enabled if req.ai_custom_rules_enabled is not None else req.aiCustomRulesEnabled
+    if custom_rules is not None: comp.ai_custom_rules_enabled = custom_rules
+    if req.industry is not None: comp.industry = req.industry.strip()
+
+    # Immutable Audit Log
+    from app.models.user import AuditLog
+    audit_entry = AuditLog(
+        id=f"aud_{uuid.uuid4().hex[:12]}",
+        company_id=comp.id,
+        actor_id=current_user.id,
+        actor_name=current_user.id,
+        actor_role=current_user.role,
+        action="WORKSPACE_SETTINGS_UPDATED",
+        resource=f"Company: {comp.name} ({comp.id})",
+        details=f"Workspace profile updated. Legal Name: {comp.legal_name or comp.name}, Tax ID: {comp.tax_id}, HQ: {comp.hq_city}",
+        ip_address="127.0.0.1",
+        severity="INFO"
+    )
+    db.add(audit_entry)
+
+    try:
+        db.commit()
+        db.refresh(comp)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Failed to persist settings: {str(e)}")
+
+    return {
+        "success": True,
+        "message": "Organization workspace settings saved and audit-logged successfully.",
+        "data": serialize_company_profile(comp)
+    }
 
 
 @app.delete("/api/v1/companies/{company_id}", tags=["Companies"])

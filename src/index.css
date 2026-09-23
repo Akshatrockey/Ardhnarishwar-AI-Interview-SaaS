@@ -310,3 +310,20 @@
 .animate-audio-wave {
   animation: audioWave 1.2s ease-in-out infinite;
 }
+
+/* Linear / Vercel Standard Tactile Micro-Interactions */
+.btn-tactile {
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.btn-tactile:active {
+  transform: scale(0.98);
+}
+
+.card-hover-lift {
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.card-hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px -6px rgba(0, 0, 0, 0.4);
+}
+

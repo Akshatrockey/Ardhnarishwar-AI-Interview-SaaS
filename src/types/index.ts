@@ -11,23 +11,115 @@ export interface Company {
   slug: string;
   domain: string;
   logo?: string;
+  logoUrl?: string;
+  logo_url?: string;
+  legalName?: string;
+  legal_name?: string;
+  displayName?: string;
+  display_name?: string;
+  faviconUrl?: string;
+  favicon_url?: string;
+  brandAccentColor?: string;
+  brand_accent_color?: string;
+  website?: string;
+  taxId?: string;
+  tax_id?: string;
+  companySize?: string;
+  company_size?: string;
+  description?: string;
+  hqStreet?: string;
+  hq_street?: string;
+  hqCity?: string;
+  hq_city?: string;
+  hqState?: string;
+  hq_state?: string;
+  hqCountry?: string;
+  hq_country?: string;
+  hqPostalCode?: string;
+  hq_postal_code?: string;
+  phone?: string;
+  contactEmail: string;
+  contact_email?: string;
+  contactPerson: string;
+  contact_person?: string;
+  supportEmail?: string;
+  support_email?: string;
+  timezone?: string;
+  currency?: string;
+  dateFormat?: string;
+  date_format?: string;
+  workWeek?: string;
+  work_week?: string;
+  socialLinks?: {
+    linkedin?: string;
+    twitter?: string;
+    github?: string;
+    portfolio?: string;
+  };
+  social_links?: Record<string, string>;
+  dataRetentionDays?: number;
+  data_retention_days?: number;
+  defaultPermissions?: Record<string, boolean>;
+  default_permissions?: Record<string, boolean>;
+  securityContactEmail?: string;
+  security_contact_email?: string;
   plan: PlanType;
   status: CompanyStatus;
   maxJobs: number;
   maxCandidatesPerMonth: number;
   createdAt: string;
-  contactEmail: string;
-  contactPerson: string;
   industry: string;
   bio?: string;
   headquarters?: string;
-  website?: string;
-  phone?: string;
   employeeCount?: number;
   aiCustomRulesEnabled: boolean;
   recordingStorageUsedMb: number;
   recordingStorageQuotaMb: number;
   meetingRoomId?: string;
+}
+
+export interface AIModelOption {
+  id: string;
+  name: string;
+  engine: 'anthropic' | 'gemini' | 'huggingface' | 'local';
+  description: string;
+  tier: string;
+  is_configured: boolean;
+  status: string;
+  default_fallback?: boolean;
+}
+
+export interface VaultKeyMoment {
+  timestamp: string;
+  seconds: number;
+  title: string;
+  category: string;
+  confidence: number;
+  badge?: string;
+}
+
+export interface VaultIndexingData {
+  session_id: string;
+  indexing_status?: string;
+  status?: string;
+  indexed_at: number | string;
+  duration_formatted?: string;
+  duration_seconds?: number;
+  video_url?: string;
+  transcription?: Array<{ timestamp: string; seconds?: number; speaker: string; text: string }>;
+  transcription_segments?: Array<{ timestamp?: string; seconds: number; speaker: string; text: string }>;
+  key_moments: VaultKeyMoment[];
+  behavioral_highlights: {
+    eye_contact_ratio?: number;
+    speaking_pace_wpm?: number;
+    hesitation_ratio?: number;
+    emotional_valence?: string;
+    facial_focus_score?: number;
+    confidence_score?: number;
+    pacing_wpm?: number;
+    star_framework_adherence?: number;
+    summary?: string;
+  };
 }
 
 export interface User {
@@ -378,6 +470,8 @@ export type RealtimeMessageType =
   | 'SUPER_ADMIN_BROADCAST'
   | 'VIDEO_MEETING_SIGNAL'
   | 'PRESENCE_SYNC'
+  | 'PANEL_CHAT'
+  | 'LIVE_SCORE_CONSENSUS'
   | 'PING'
   | 'PONG';
 

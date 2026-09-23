@@ -276,6 +276,9 @@ export class AppDataStore {
   static getAuditLogs(): AuditLog[] {
     return getStored<AuditLog[]>(STORAGE_KEYS.AUDIT_LOGS, []);
   }
+  static getActivityLogs(): AuditLog[] {
+    return this.getAuditLogs();
+  }
   static logActivity(log: Omit<AuditLog, 'id' | 'timestamp'>): void {
     const logs = this.getAuditLogs();
     const newLog: AuditLog = {

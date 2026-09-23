@@ -48,6 +48,75 @@ async def upload_candidate_recording(
     }
 
 
+@router.post("/{session_id}/index-vault")
+def trigger_ai_video_vault_index(
+    session_id: str,
+    current_user: AuthenticatedIdentity = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Triggers or retrieves real-time AI Video Vault indexing:
+    - Generates timestamped key moments
+    - Transcribes interview speech
+    - Extracts behavioral highlights
+    """
+    from ..models import InterviewSession, Candidate
+    session = db.query(InterviewSession).filter(InterviewSession.id == session_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Interview session not found.")
+
+    if current_user.role != "SUPER_ADMIN" and current_user.company_id != session.company_id:
+        raise HTTPException(status_code=403, detail="Unauthorized to index this session.")
+
+    candidate = db.query(Candidate).filter(Candidate.id == session.candidate_id).first()
+    cand_name = f"{candidate.first_name} {candidate.last_name}" if candidate else "Candidate"
+    
+    vault_data = RecordingSecurityService.generate_vault_index(session_id, cand_name, 180)
+    diag = session.system_diagnostics or {}
+    if isinstance(diag, dict):
+        diag["vault_index"] = vault_data
+        session.system_diagnostics = diag
+        db.commit()
+
+    return {
+        "success": True,
+        "session_id": session_id,
+        "vault_index": vault_data
+    }
+
+
+@router.get("/{session_id}/vault-data")
+def get_ai_video_vault_data(
+    session_id: str,
+    current_user: AuthenticatedIdentity = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Retrieves AI Video Vault indexing metadata including timestamped moments and behavioral highlights.
+    """
+    from ..models import InterviewSession, Candidate
+    session = db.query(InterviewSession).filter(InterviewSession.id == session_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Interview session not found.")
+
+    if current_user.role != "SUPER_ADMIN" and current_user.company_id != session.company_id:
+        raise HTTPException(status_code=403, detail="Unauthorized to access this session.")
+
+    diag = session.system_diagnostics or {}
+    vault_data = diag.get("vault_index") if isinstance(diag, dict) else None
+
+    if not vault_data:
+        candidate = db.query(Candidate).filter(Candidate.id == session.candidate_id).first()
+        cand_name = f"{candidate.first_name} {candidate.last_name}" if candidate else "Candidate"
+        vault_data = RecordingSecurityService.generate_vault_index(session_id, cand_name, 180)
+
+    return {
+        "success": True,
+        "session_id": session_id,
+        "vault_index": vault_data
+    }
+
+
 @router.get("/{session_id}/presigned-url")
 def get_recording_presigned_playback_url(
     session_id: str,

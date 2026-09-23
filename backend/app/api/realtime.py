@@ -230,6 +230,24 @@ async def websocket_realtime_endpoint(
                     # Platform-wide broadcast to all connected clients
                     await manager.broadcast_all(msg)
 
+                elif msg_type == "PANEL_CHAT":
+                    # In-room chat or private panel whisper
+                    room = target_room or (f"interview_{payload.get('roomId')}" if payload.get('roomId') else "global_broadcast")
+                    is_private = payload.get("isPrivatePanelOnly", False)
+                    if is_private:
+                        # Whisper only to panel members (exclude candidates)
+                        for cid, meta in list(manager.client_metadata.items()):
+                            if meta.get("role") in ("SUPER_ADMIN", "COMPANY_ADMIN", "RECRUITER", "EMPLOYEE"):
+                                await manager.send_to_client(cid, msg)
+                    else:
+                        await manager.broadcast_to_room(room, msg, exclude_client_id=client_id)
+
+                elif msg_type == "LIVE_SCORE_CONSENSUS":
+                    # Synchronized live scorecard ratings across all panel interviewers
+                    room = target_room or (f"interview_{payload.get('sessionId')}" if payload.get('sessionId') else "global_broadcast")
+                    await manager.broadcast_to_room(room, msg)
+                    await manager.broadcast_to_role("SUPER_ADMIN", msg)
+
                 elif msg_type == "VIDEO_MEETING_SIGNAL":
                     # Target specific room or broadcast
                     if target_room:

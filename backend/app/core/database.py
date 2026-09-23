@@ -85,10 +85,48 @@ def get_engine(database_url: Optional[str] = None, echo: bool = False):
                 connect_args={"check_same_thread": False},
                 echo=echo or settings.DB_ECHO_SQL
             )
-        raise
+def auto_migrate_schema(target_engine):
+    """Safely adds missing columns to existing SQLite / MySQL tables."""
+    new_cols = [
+        ("legal_name", "VARCHAR(255)"),
+        ("display_name", "VARCHAR(255)"),
+        ("favicon_url", "TEXT"),
+        ("brand_accent_color", "VARCHAR(32) DEFAULT '#06B6D4'"),
+        ("website", "VARCHAR(255)"),
+        ("tax_id", "VARCHAR(100)"),
+        ("company_size", "VARCHAR(50) DEFAULT '51-200 employees'"),
+        ("description", "TEXT"),
+        ("hq_street", "VARCHAR(255)"),
+        ("hq_city", "VARCHAR(100)"),
+        ("hq_state", "VARCHAR(100)"),
+        ("hq_country", "VARCHAR(100)"),
+        ("hq_postal_code", "VARCHAR(50)"),
+        ("phone", "VARCHAR(50)"),
+        ("support_email", "VARCHAR(255)"),
+        ("timezone", "VARCHAR(100) DEFAULT 'UTC'"),
+        ("currency", "VARCHAR(20) DEFAULT 'USD'"),
+        ("date_format", "VARCHAR(50) DEFAULT 'YYYY-MM-DD'"),
+        ("work_week", "VARCHAR(100) DEFAULT 'Monday - Friday'"),
+        ("social_links", "TEXT"),
+        ("data_retention_days", "INTEGER DEFAULT 365"),
+        ("default_permissions", "TEXT"),
+        ("security_contact_email", "VARCHAR(255)"),
+        ("settings_metadata", "TEXT"),
+    ]
+    try:
+        with target_engine.connect() as conn:
+            for col_name, col_type in new_cols:
+                try:
+                    conn.execute(text(f"ALTER TABLE companies ADD COLUMN {col_name} {col_type}"))
+                    conn.commit()
+                except Exception:
+                    pass
+    except Exception:
+        pass
 
 # Primary Engine Instance
 engine = get_engine()
+auto_migrate_schema(engine)
 
 # Session Factory
 SessionLocal = sessionmaker(
