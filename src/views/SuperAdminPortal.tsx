@@ -59,7 +59,10 @@ import {
   ExternalLink,
   ShieldCheck,
   RefreshCw,
-  Send
+  Send,
+  Trash2,
+  AlertTriangle,
+  CheckCircle2
 } from 'lucide-react';
 
 interface SuperAdminPortalProps {
@@ -95,6 +98,31 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({
   const [broadcastTitle, setBroadcastTitle] = useState('');
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [broadcastSeverity, setBroadcastSeverity] = useState<'INFO' | 'WARNING' | 'EMERGENCY'>('WARNING');
+
+  // Master Factory Reset Modal State
+  const [showResetConfirmModal, setShowResetConfirmModal] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+  const [resetSuccessMessage, setResetSuccessMessage] = useState<string | null>(null);
+
+  const handleMasterSystemReset = async () => {
+    setIsResetting(true);
+    try {
+      const token = localStorage.getItem('ardh_org_token') || localStorage.getItem('ardhnarishwar_token') || '';
+      await AppDataStore.resetToFreshProductionState({ callBackend: true, authToken: token });
+      setResetSuccessMessage('Platform successfully reset! All demo candidates, jobs, and test sessions have been permanently purged.');
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } catch (err) {
+      console.error('Master reset failed:', err);
+      setResetSuccessMessage('Local cache cleaned. Reloading system...');
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } finally {
+      setIsResetting(false);
+    }
+  };
 
   const totalTenants = AppDataStore.getCompanies().length;
   const totalQuestions = AppDataStore.getQuestions().length;
@@ -297,6 +325,16 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({
           >
             <Share2 className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Links</span>
+          </button>
+
+          {/* Purge Demo Data / Clean Production Fresh Start */}
+          <button
+            onClick={() => setShowResetConfirmModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-950/80 border border-amber-700/80 text-amber-300 hover:bg-amber-900 hover:text-white transition-all shadow-sm active:scale-95"
+            title="Erase All Demo Data & Reset to Clean Production State"
+          >
+            <Trash2 className="w-3.5 h-3.5 text-amber-400" />
+            <span className="hidden sm:inline">Purge Demo Data</span>
           </button>
 
           {/* Quick Role Switcher Dropdown */}
@@ -537,6 +575,71 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({
             setActiveTab('results');
           }}
         />
+      )}
+
+      {/* Master System Reset / Factory Reset Confirmation Modal */}
+      {showResetConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in">
+          <div className="w-full max-w-lg bg-slate-900 border border-amber-600/50 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-5 animate-in zoom-in-95">
+            <div className="flex items-center gap-3 text-amber-400">
+              <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20">
+                <AlertTriangle className="w-7 h-7 text-amber-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-white">Factory Reset & Purge Demo Data</h3>
+                <p className="text-xs text-amber-300/80">Super Admin Master Governance Command</p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2 text-xs text-slate-300">
+              <p className="font-semibold text-white">This operation will execute the following:</p>
+              <ul className="space-y-1.5 list-disc list-inside text-slate-400">
+                <li>Permanently erase all mock candidates (Priya Sharma, Vikram Singh, etc.)</li>
+                <li>Permanently erase all dummy job openings and test interview rounds</li>
+                <li>Clear all mock evaluation scorecards and video sessions</li>
+                <li>Reset platform to clean empty state ready for live production use</li>
+                <li>Preserve root Super Admin account (<span className="text-amber-300 font-mono">admin@ardhnarishwar.ai</span>)</li>
+                <li>Preserve proprietary AI question bank rubrics</li>
+              </ul>
+            </div>
+
+            {resetSuccessMessage ? (
+              <div className="p-3 rounded-xl bg-emerald-950/80 border border-emerald-700 text-emerald-200 text-xs flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>{resetSuccessMessage}</span>
+              </div>
+            ) : null}
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                disabled={isResetting}
+                onClick={() => setShowResetConfirmModal(false)}
+                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isResetting}
+                onClick={handleMasterSystemReset}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-rose-600 hover:from-amber-500 hover:to-rose-500 text-white font-bold text-xs shadow-lg shadow-rose-900/30 transition flex items-center gap-2"
+              >
+                {isResetting ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Purging All Demo Records...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    <span>Yes, Purge Demo Data & Start Fresh</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>

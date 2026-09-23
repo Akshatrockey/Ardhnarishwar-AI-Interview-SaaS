@@ -65,7 +65,7 @@ const AppContent: React.FC = () => {
 
       // 2. Strict Portal Route Guard & Segregation
       if (currentUser) {
-        // A. Candidate trying to access Enterprise routes (/org/*)
+        // A. Candidate trying to access Enterprise (/org/*) or Admin (/admin/*) routes
         if (currentUser.role === 'CANDIDATE' && (pathname.startsWith('/org') || pathname.startsWith('/admin'))) {
           console.warn('[SECURITY 403] Candidate attempted unauthorized access to Enterprise Portal.');
           setAccessDeniedMessage('403 Forbidden: Candidate accounts cannot access Enterprise Recruiter administration routes. Redirected to Candidate Career Portal.');
@@ -75,8 +75,17 @@ const AppContent: React.FC = () => {
           return;
         }
 
-        // B. Enterprise HR trying to access Candidate routes (/candidate/*)
-        if (currentUser.role !== 'CANDIDATE' && pathname.startsWith('/candidate') && !params.get('preview')) {
+        // B. Non-Super Admin trying to access /admin routes
+        if (currentUser.role !== 'SUPER_ADMIN' && currentUser.role !== 'CANDIDATE' && pathname.startsWith('/admin')) {
+          setAccessDeniedMessage('403 Forbidden: Super Admin Console requires master platform credentials. Redirected to Enterprise Workspace.');
+          setTimeout(() => setAccessDeniedMessage(null), 4000);
+          navigate('/org/dashboard');
+          document.title = 'Ardhnarishwar AI — Enterprise & Recruiter Portal';
+          return;
+        }
+
+        // C. Enterprise HR (non-super-admin) trying to access Candidate routes (/candidate/*)
+        if (currentUser.role !== 'CANDIDATE' && currentUser.role !== 'SUPER_ADMIN' && pathname.startsWith('/candidate') && !params.get('preview')) {
           setAccessDeniedMessage('Redirected to your Enterprise Recruiter Portal.');
           setTimeout(() => setAccessDeniedMessage(null), 3500);
           navigate('/org/dashboard');
@@ -167,21 +176,49 @@ const AppContent: React.FC = () => {
 
     // 4. ROLE-BASED DEDICATED FRONTENDS (NO MIXED DASHBOARDS)
 
-    // Role 1: Super Admin Master Console
+    // Role 1: Super Admin Master Console (Full Control Across All Portals)
     if (currentUser.role === 'SUPER_ADMIN') {
+      if (pathname.startsWith('/candidate')) {
+        return (
+          <CandidatePortal
+            initialToken={candidateTokenForChamber}
+            onBackToApp={() => navigate('/admin/dashboard')}
+          />
+        );
+      }
+      if (pathname.startsWith('/org')) {
+        return (
+          <CompanyAdminPortal
+            onSwitchToSuperAdmin={() => navigate('/admin/dashboard')}
+            onSwitchToStaff={() => {
+              const emp = AppDataStore.getUsers().find(u => u.role === 'EMPLOYEE');
+              if (emp) switchPersona(emp.id);
+            }}
+            onSwitchToCandidate={(target?: Candidate | string) => {
+              if (typeof target === 'string') {
+                setCandidateTokenForChamber(target);
+              } else if (target && target.interviewToken) {
+                setCandidateTokenForChamber(target.interviewToken);
+              }
+              navigate('/candidate/dashboard');
+            }}
+            onLogout={handleLogout}
+            onOpenLandingPage={() => {
+              setShowLandingPage(true);
+              navigate('/landing');
+            }}
+          />
+        );
+      }
+
       return (
         <RoleGuard allowedRoles={['SUPER_ADMIN']}>
           <SuperAdminPortal
             onSwitchToCandidate={() => {
-              const cands = AppDataStore.getCandidates();
-              if (cands.length > 0) {
-                setCandidateTokenForChamber(cands[0].interviewToken);
-                navigate('/candidate/dashboard');
-              }
+              navigate('/candidate/dashboard');
             }}
             onSwitchToCompany={() => {
-              const ca = AppDataStore.getUsers().find(u => u.role === 'COMPANY_ADMIN');
-              if (ca) switchPersona(ca.id);
+              navigate('/org/dashboard');
             }}
             onSwitchToStaff={() => {
               const emp = AppDataStore.getUsers().find(u => u.role === 'EMPLOYEE');

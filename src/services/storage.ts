@@ -44,17 +44,20 @@ export async function copyToClipboard(text: string): Promise<boolean> {
   }
 }
 
+const SCHEMA_VERSION_KEY = 'ardhnarishwar_schema_version';
+const CURRENT_SCHEMA_VERSION = 'v2_clean_production_2026';
+
 const STORAGE_KEYS = {
-  COMPANIES: 'ardhnarishwar_companies_v1',
-  USERS: 'ardhnarishwar_users_v1',
-  JOBS: 'ardhnarishwar_jobs_v1',
-  ROUNDS: 'ardhnarishwar_rounds_v1',
-  QUESTIONS: 'ardhnarishwar_questions_v1',
-  CANDIDATES: 'ardhnarishwar_candidates_v1',
-  SESSIONS: 'ardhnarishwar_sessions_v1',
-  AUDIT_LOGS: 'ardhnarishwar_audit_logs_v1',
-  PLANS: 'ardhnarishwar_plans_v1',
-  HYPERPARAMS: 'ardhnarishwar_ai_hyperparams_v1',
+  COMPANIES: 'ardhnarishwar_companies_v2',
+  USERS: 'ardhnarishwar_users_v2',
+  JOBS: 'ardhnarishwar_jobs_v2',
+  ROUNDS: 'ardhnarishwar_rounds_v2',
+  QUESTIONS: 'ardhnarishwar_questions_v2',
+  CANDIDATES: 'ardhnarishwar_candidates_v2',
+  SESSIONS: 'ardhnarishwar_sessions_v2',
+  AUDIT_LOGS: 'ardhnarishwar_audit_logs_v2',
+  PLANS: 'ardhnarishwar_plans_v2',
+  HYPERPARAMS: 'ardhnarishwar_ai_hyperparams_v2',
 };
 
 // IndexedDB setup for video chunk storage
@@ -143,6 +146,19 @@ function setStored<T>(key: string, val: T): void {
 export class AppDataStore {
   // Initialize production state with rich enterprise seed records when empty
   static init(): void {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const currentVer = localStorage.getItem(SCHEMA_VERSION_KEY);
+      if (currentVer !== CURRENT_SCHEMA_VERSION) {
+        // Clear all previous v1 or demo keys
+        Object.keys(localStorage).forEach(key => {
+          if (key.startsWith('ardhnarishwar_') || key.startsWith('ardh_')) {
+            localStorage.removeItem(key);
+          }
+        });
+        localStorage.setItem(SCHEMA_VERSION_KEY, CURRENT_SCHEMA_VERSION);
+      }
+    }
+
     const storedCompanies = getStored<Company[] | null>(STORAGE_KEYS.COMPANIES, null);
     if (!storedCompanies || storedCompanies.length === 0) {
       setStored(STORAGE_KEYS.COMPANIES, INITIAL_COMPANIES);
@@ -300,14 +316,45 @@ export class AppDataStore {
   // Reset storage to enterprise defaults
   static resetToDefault(): void {
     if (typeof localStorage !== 'undefined') {
-      localStorage.removeItem(STORAGE_KEYS.COMPANIES);
-      localStorage.removeItem(STORAGE_KEYS.JOBS);
-      localStorage.removeItem(STORAGE_KEYS.ROUNDS);
-      localStorage.removeItem(STORAGE_KEYS.QUESTIONS);
-      localStorage.removeItem(STORAGE_KEYS.CANDIDATES);
-      localStorage.removeItem(STORAGE_KEYS.SESSIONS);
-      localStorage.removeItem(STORAGE_KEYS.AUDIT_LOGS);
+      Object.values(STORAGE_KEYS).forEach(k => {
+        localStorage.removeItem(k);
+      });
     }
     this.init();
+  }
+
+  // Complete Factory Reset & Wipe to Clean Production State (Purges demo data)
+  static async resetToFreshProductionState(options?: { callBackend?: boolean; authToken?: string }): Promise<void> {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('ardhnarishwar_') || key.startsWith('ardh_')) {
+          localStorage.removeItem(key);
+        }
+      });
+      localStorage.setItem(SCHEMA_VERSION_KEY, CURRENT_SCHEMA_VERSION);
+    }
+    memoryStore.clear();
+    this.init();
+
+    if (options?.callBackend) {
+      try {
+        const token = options.authToken || (typeof window !== 'undefined' ? (localStorage.getItem('ardh_org_token') || localStorage.getItem('ardhnarishwar_auth_token')) : null);
+        if (token) {
+          await fetch('/api/v1/admin/system/fresh-start', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              confirmation_key: 'CONFIRM_ERASE_ALL_DATA_2026',
+              keep_root_admin: true
+            })
+          });
+        }
+      } catch (err) {
+        console.warn('Backend fresh-start error:', err);
+      }
+    }
   }
 }

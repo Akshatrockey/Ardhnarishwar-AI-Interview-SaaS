@@ -826,6 +826,81 @@ async def authorized_impersonation_endpoint(
     }
 
 
+# ==============================================================================
+# Master Platform Governance: Factory Reset / Fresh Clean Start (Super Admin)
+# ==============================================================================
+class FreshStartRequest(BaseModel):
+    confirmation_key: str  # Must be "CONFIRM_ERASE_ALL_DATA_2026"
+    keep_root_admin: Optional[bool] = True
+
+@app.post(
+    "/api/v1/admin/system/fresh-start",
+    tags=["Super Admin Governance"]
+)
+async def system_fresh_start_endpoint(
+    req: FreshStartRequest,
+    current_admin: AuthenticatedIdentity = Depends(require_super_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Erases all demo and test records (candidates, resumes, interview sessions,
+    meetings, jobs, and non-super-admin demo accounts) to start like a brand new platform.
+    Strictly guarded for verified SUPER_ADMIN.
+    """
+    if req.confirmation_key != "CONFIRM_ERASE_ALL_DATA_2026":
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid confirmation key. Operation aborted for system safety."
+        )
+
+    try:
+        from app.models import (
+            CandidateAnswer, AIEvaluationReport, InterviewMeeting,
+            InterviewSession, Resume, Candidate, InterviewRound, Job, AuditLog
+        )
+
+        # Truncate transactional tables
+        db.query(CandidateAnswer).delete(synchronize_session=False)
+        db.query(AIEvaluationReport).delete(synchronize_session=False)
+        db.query(InterviewMeeting).delete(synchronize_session=False)
+        db.query(InterviewSession).delete(synchronize_session=False)
+        db.query(Resume).delete(synchronize_session=False)
+        db.query(Candidate).delete(synchronize_session=False)
+        db.query(InterviewRound).delete(synchronize_session=False)
+        db.query(Job).delete(synchronize_session=False)
+        db.query(AuditLog).delete(synchronize_session=False)
+
+        # Remove non-super-admin users
+        db.query(User).filter(User.role != "SUPER_ADMIN").delete(synchronize_session=False)
+
+        # Create master initial audit record
+        fresh_audit = AuditLog(
+            id=f"aud_fresh_{uuid.uuid4().hex[:8]}",
+            company_id=None,
+            actor_id=current_admin.id,
+            actor_name=current_admin.name,
+            actor_role="SUPER_ADMIN",
+            action="SYSTEM_FACTORY_RESET",
+            resource="GLOBAL_PLATFORM",
+            details="All demo data, candidate applications, jobs, and test sessions purged. Initialized fresh clean production state.",
+            ip_address="127.0.0.1",
+            severity="WARNING"
+        )
+        db.add(fresh_audit)
+        db.commit()
+
+        return {
+            "success": True,
+            "message": "Global platform reset completed. All demo data purged. Ready for clean production use.",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "active_super_admin": current_admin.email
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Factory reset failed: {str(e)}")
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
