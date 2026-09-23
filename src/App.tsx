@@ -28,7 +28,13 @@ const AppContent: React.FC = () => {
   // Navigation & Direct Chamber State
   const [currentPath, setCurrentPath] = useState<string>(window.location.pathname);
   const [candidateTokenForChamber, setCandidateTokenForChamber] = useState<string>('');
-  const [showLandingPage, setShowLandingPage] = useState<boolean>(false);
+  const [showLandingPage, setShowLandingPage] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    const path = window.location.pathname.toLowerCase();
+    const isAuth = path.includes('/auth') || path.includes('/login') || path.includes('/register');
+    const hasToken = new URLSearchParams(window.location.search).get('token');
+    return !isAuth && !hasToken;
+  });
   const [authInitialTab, setAuthInitialTab] = useState<'admin' | 'candidate' | 'company_register' | 'employee_register'>('admin');
   const [accessDeniedMessage, setAccessDeniedMessage] = useState<string | null>(null);
 
@@ -47,19 +53,20 @@ const AppContent: React.FC = () => {
 
       const token = params.get('token') || params.get('interview');
       const pageParam = params.get('page');
+      const isAuthRoute = pathname.includes('/auth') || pathname.includes('/login') || pathname.includes('/register');
+      const isDashboardRoute = pathname.includes('/dashboard');
 
-      // 0. Landing Page Direct Link (?page=landing or /)
-      if (pageParam === 'landing' || pathname === '/landing') {
-        setShowLandingPage(true);
-        document.title = 'Ardhnarishwar AI — Autonomous SaaS Recruitment Platform';
-        return;
-      }
-
-      // 1. Direct Token Candidate AI Chamber Link (?token=...)
+      // 0. Website Frontend (Landing Page) by Default for root '/' and non-auth paths
       if (token) {
         setCandidateTokenForChamber(token);
         setShowLandingPage(false);
-        document.title = 'Ardhnarishwar AI — Candidate Career Portal';
+        document.title = 'Ardhnarishwar AI Robotics — Candidate Career Portal';
+        return;
+      }
+
+      if (pathname === '/' || pathname === '' || pathname === '/landing' || pageParam === 'landing' || (!currentUser && !isAuthRoute && !isDashboardRoute)) {
+        setShowLandingPage(true);
+        document.title = 'Ardhnarishwar AI Robotics — Autonomous SaaS Recruitment Platform';
         return;
       }
 
@@ -71,7 +78,7 @@ const AppContent: React.FC = () => {
           setAccessDeniedMessage('403 Forbidden: Candidate accounts cannot access Enterprise Recruiter administration routes. Redirected to Candidate Career Portal.');
           setTimeout(() => setAccessDeniedMessage(null), 5000);
           navigate('/candidate/dashboard');
-          document.title = 'Ardhnarishwar AI — Candidate Career Portal';
+          document.title = 'Ardhnarishwar AI Robotics — Candidate Career Portal';
           return;
         }
 
@@ -80,7 +87,7 @@ const AppContent: React.FC = () => {
           setAccessDeniedMessage('403 Forbidden: Super Admin Console requires master platform credentials. Redirected to Enterprise Workspace.');
           setTimeout(() => setAccessDeniedMessage(null), 4000);
           navigate('/org/dashboard');
-          document.title = 'Ardhnarishwar AI — Enterprise & Recruiter Portal';
+          document.title = 'Ardhnarishwar AI Robotics — Enterprise & Recruiter Portal';
           return;
         }
 
@@ -89,20 +96,20 @@ const AppContent: React.FC = () => {
           setAccessDeniedMessage('Redirected to your Enterprise Recruiter Portal.');
           setTimeout(() => setAccessDeniedMessage(null), 3500);
           navigate('/org/dashboard');
-          document.title = 'Ardhnarishwar AI — Enterprise & Recruiter Portal';
+          document.title = 'Ardhnarishwar AI Robotics — Enterprise & Recruiter Portal';
           return;
         }
       }
 
       // 3. Dynamic Title Updates
       if (pathname.startsWith('/candidate') || currentUser?.role === 'CANDIDATE') {
-        document.title = 'Ardhnarishwar AI — Candidate Career Portal';
+        document.title = 'Ardhnarishwar AI Robotics — Candidate Career Portal';
       } else if (currentUser?.role === 'SUPER_ADMIN') {
-        document.title = 'Ardhnarishwar AI — Super Admin Master Console';
+        document.title = 'Ardhnarishwar AI Robotics — Super Admin Master Console';
       } else if (pathname.startsWith('/org') || currentUser?.role === 'COMPANY_ADMIN' || currentUser?.role === 'RECRUITER' || currentUser?.role === 'EMPLOYEE') {
-        document.title = 'Ardhnarishwar AI — Enterprise & Recruiter Portal';
+        document.title = 'Ardhnarishwar AI Robotics — Enterprise & Recruiter Portal';
       } else {
-        document.title = 'Ardhnarishwar AI — Enterprise & Recruiter Portal';
+        document.title = 'Ardhnarishwar AI Robotics — Autonomous SaaS Recruitment Platform';
       }
     };
 
@@ -114,12 +121,14 @@ const AppContent: React.FC = () => {
   const handleLogout = () => {
     logout();
     setCandidateTokenForChamber('');
-    setShowLandingPage(false);
+    setShowLandingPage(true);
     navigate('/');
   };
 
   const renderPortalContent = () => {
     const pathname = currentPath.toLowerCase();
+    const isAuthRoute = pathname.includes('/auth') || pathname.includes('/login') || pathname.includes('/register');
+    const isDashboardRoute = pathname.includes('/dashboard');
 
     // 1. Direct Token Candidate AI Chamber Link (?token=...) or Chamber launch button clicked
     if (candidateTokenForChamber) {
@@ -131,8 +140,8 @@ const AppContent: React.FC = () => {
       );
     }
 
-    // 2. Landing Page View (Commercial SaaS Showcase)
-    if (showLandingPage || pathname === '/landing') {
+    // 2. Landing Page View (Website Frontend Presentation - DEFAULT ON ROOT)
+    if (showLandingPage || pathname === '/' || pathname === '' || pathname === '/landing' || (!currentUser && !isAuthRoute && !isDashboardRoute)) {
       return (
         <LandingPage
           onNavigateAuth={(tab) => {
@@ -140,6 +149,8 @@ const AppContent: React.FC = () => {
             setShowLandingPage(false);
             if (tab === 'candidate') {
               navigate('/candidate/auth/login');
+            } else if (tab === 'company_register') {
+              navigate('/org/auth/register');
             } else {
               navigate('/org/auth/login');
             }
@@ -156,7 +167,7 @@ const AppContent: React.FC = () => {
       );
     }
 
-    // 3. UNAUTHENTICATED ROUTE HANDLING (Strict Branding Isolation)
+    // 3. UNAUTHENTICATED ROUTE HANDLING (Explicit /auth or /login routes only)
     if (!isAuthenticated || !currentUser) {
       const isCandidateRoute = pathname.startsWith('/candidate');
       return (

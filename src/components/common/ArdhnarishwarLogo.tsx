@@ -121,8 +121,8 @@ export const ArdhnarishwarLogo: React.FC<ArdhnarishwarLogoProps> = ({
             >
               ARDHNARISHWAR
             </span>
-            <span className="px-1.5 py-0.2 rounded font-mono text-[9px] font-extrabold bg-cyan-950 text-cyan-300 border border-cyan-700/60 uppercase">
-              AI
+            <span className="px-1.5 py-0.5 rounded font-mono text-[9px] font-extrabold bg-cyan-950 text-cyan-300 border border-cyan-700/60 uppercase tracking-wider">
+              AI ROBOTICS
             </span>
           </div>
 
@@ -130,7 +130,7 @@ export const ArdhnarishwarLogo: React.FC<ArdhnarishwarLogoProps> = ({
             <span
               className={`${subtextSizes} font-mono tracking-widest text-cyan-400/90 uppercase font-semibold leading-none mt-0.5`}
             >
-              Autonomous Interview SaaS
+              Enterprise AI Robotics SaaS
             </span>
           )}
         </div>
