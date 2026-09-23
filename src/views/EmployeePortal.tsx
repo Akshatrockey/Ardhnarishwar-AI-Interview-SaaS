@@ -15,7 +15,6 @@ import { CompanySettings } from '../components/company-admin/CompanySettings';
 import { ArdhnarishwarLogo } from '../components/common/ArdhnarishwarLogo';
 import { UserProfileModal } from '../components/common/UserProfileModal';
 import { ShareLinksModal } from '../components/common/ShareLinksModal';
-import { AIChatbox } from '../components/chatbox/AIChatbox';
 
 import { 
   User, 
@@ -526,8 +525,6 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
           {renderActiveView()}
         </main>
       </div>
-
-      <AIChatbox />
 
       {showShareModal && (
         <ShareLinksModal

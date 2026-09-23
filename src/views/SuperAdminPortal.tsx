@@ -28,7 +28,6 @@ import { EmailSettingsPanel } from '../components/company-admin/EmailSettingsPan
 import { LiveVideoConferenceRoom } from '../components/conference/LiveVideoConferenceRoom';
 import { ScheduleInterviewModal } from '../components/company-admin/ScheduleInterviewModal';
 import { CandidatePipeline } from '../components/company-admin/CandidatePipeline';
-import { AIChatbox } from '../components/chatbox/AIChatbox';
 
 import { AppDataStore } from '../services/storage';
 import { Candidate, JobPosition } from '../types';
@@ -446,9 +445,6 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({
           {renderActiveTab()}
         </main>
       </div>
-
-      {/* Floating AI Copilot Chatbox */}
-      <AIChatbox />
 
       {/* Broadcast Alert Modal */}
       {showBroadcastModal && (

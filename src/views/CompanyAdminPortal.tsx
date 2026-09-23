@@ -21,7 +21,6 @@ import { ScheduleInterviewModal } from '../components/company-admin/ScheduleInte
 import { EmailSettingsPanel } from '../components/company-admin/EmailSettingsPanel';
 import { InterviewResultsPanel } from '../components/company-admin/InterviewResultsPanel';
 import { LiveVideoConferenceRoom } from '../components/conference/LiveVideoConferenceRoom';
-import { AIChatbox } from '../components/chatbox/AIChatbox';
 
 import { AppDataStore } from '../services/storage';
 import { Candidate, JobPosition } from '../types';
@@ -410,9 +409,6 @@ export const CompanyAdminPortal: React.FC<CompanyAdminPortalProps> = ({
           {renderActiveTab()}
         </main>
       </div>
-
-      {/* Floating AI Copilot */}
-      <AIChatbox />
 
       {/* Share Links Modal */}
       {showShareModal && (
