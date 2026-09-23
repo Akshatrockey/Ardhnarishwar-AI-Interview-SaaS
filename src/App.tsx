@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { TenantProvider, useTenant } from './context/TenantContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
@@ -17,32 +17,41 @@ import { AIChatbox } from './components/chatbox/AIChatbox';
 
 import { AppDataStore } from './services/storage';
 import { Candidate, JobPosition } from './types';
+import { ShieldAlert, AlertCircle, X, CheckCircle2 } from 'lucide-react';
 
 const AppContent: React.FC = () => {
-  const { currentUser, role, logout, switchPersona, isAuthenticated } = useAuth();
+  const { currentUser, role, logout, logoutOrg, logoutCandidate, switchPersona, isAuthenticated } = useAuth();
   const { theme } = useTheme();
   const { t } = useLanguage();
   const { activeBroadcasts, dismissBroadcast } = useRealtime();
 
   // Navigation & Direct Chamber State
+  const [currentPath, setCurrentPath] = useState<string>(window.location.pathname);
   const [candidateTokenForChamber, setCandidateTokenForChamber] = useState<string>('');
   const [showLandingPage, setShowLandingPage] = useState<boolean>(false);
   const [authInitialTab, setAuthInitialTab] = useState<'admin' | 'candidate' | 'company_register' | 'employee_register'>('admin');
   const [accessDeniedMessage, setAccessDeniedMessage] = useState<string | null>(null);
 
-  // Global URL Routing & Route Protection
+  // Safe navigation helper
+  const navigate = useCallback((path: string) => {
+    window.history.pushState(null, '', path);
+    setCurrentPath(path);
+  }, []);
+
+  // Sync document.title and Route Isolation Guards
   useEffect(() => {
     const handleUrlRouting = () => {
+      const pathname = window.location.pathname.toLowerCase();
       const params = new URLSearchParams(window.location.search);
-      
+      setCurrentPath(pathname);
+
       const token = params.get('token') || params.get('interview');
-      const roleParam = params.get('role') || params.get('persona') || params.get('user');
-      const portalParam = params.get('portal');
       const pageParam = params.get('page');
 
-      // 0. Landing Page Direct Link (?page=landing)
-      if (pageParam === 'landing') {
+      // 0. Landing Page Direct Link (?page=landing or /)
+      if (pageParam === 'landing' || pathname === '/landing') {
         setShowLandingPage(true);
+        document.title = 'Ardhnarishwar AI — Autonomous SaaS Recruitment Platform';
         return;
       }
 
@@ -50,34 +59,59 @@ const AppContent: React.FC = () => {
       if (token) {
         setCandidateTokenForChamber(token);
         setShowLandingPage(false);
+        document.title = 'Ardhnarishwar AI — Candidate Career Portal';
         return;
       }
 
-      // 2. URL Role Protection Check: Prevent URL Tampering
-      if (roleParam && currentUser) {
-        const requested = roleParam.toUpperCase().trim();
-        // If candidate or employee tries to access admin via URL param
-        if ((requested === 'SUPER_ADMIN' || requested === 'ADMIN') && currentUser.role !== 'SUPER_ADMIN') {
-          console.warn(`[SECURITY] Blocked unauthorized URL escalation from ${currentUser.role} to SUPER_ADMIN.`);
-          setAccessDeniedMessage(`Access Denied: You cannot switch to Super Admin with your current role (${currentUser.role}).`);
-          setTimeout(() => setAccessDeniedMessage(null), 4000);
+      // 2. Strict Portal Route Guard & Segregation
+      if (currentUser) {
+        // A. Candidate trying to access Enterprise routes (/org/*)
+        if (currentUser.role === 'CANDIDATE' && (pathname.startsWith('/org') || pathname.startsWith('/admin'))) {
+          console.warn('[SECURITY 403] Candidate attempted unauthorized access to Enterprise Portal.');
+          setAccessDeniedMessage('403 Forbidden: Candidate accounts cannot access Enterprise Recruiter administration routes. Redirected to Candidate Career Portal.');
+          setTimeout(() => setAccessDeniedMessage(null), 5000);
+          navigate('/candidate/dashboard');
+          document.title = 'Ardhnarishwar AI — Candidate Career Portal';
           return;
         }
+
+        // B. Enterprise HR trying to access Candidate routes (/candidate/*)
+        if (currentUser.role !== 'CANDIDATE' && pathname.startsWith('/candidate') && !params.get('preview')) {
+          setAccessDeniedMessage('Redirected to your Enterprise Recruiter Portal.');
+          setTimeout(() => setAccessDeniedMessage(null), 3500);
+          navigate('/org/dashboard');
+          document.title = 'Ardhnarishwar AI — Enterprise & Recruiter Portal';
+          return;
+        }
+      }
+
+      // 3. Dynamic Title Updates
+      if (pathname.startsWith('/candidate') || currentUser?.role === 'CANDIDATE') {
+        document.title = 'Ardhnarishwar AI — Candidate Career Portal';
+      } else if (currentUser?.role === 'SUPER_ADMIN') {
+        document.title = 'Ardhnarishwar AI — Super Admin Master Console';
+      } else if (pathname.startsWith('/org') || currentUser?.role === 'COMPANY_ADMIN' || currentUser?.role === 'RECRUITER' || currentUser?.role === 'EMPLOYEE') {
+        document.title = 'Ardhnarishwar AI — Enterprise & Recruiter Portal';
+      } else {
+        document.title = 'Ardhnarishwar AI — Enterprise & Recruiter Portal';
       }
     };
 
     handleUrlRouting();
     window.addEventListener('popstate', handleUrlRouting);
     return () => window.removeEventListener('popstate', handleUrlRouting);
-  }, [currentUser]);
+  }, [currentUser, navigate]);
 
   const handleLogout = () => {
     logout();
     setCandidateTokenForChamber('');
     setShowLandingPage(false);
+    navigate('/');
   };
 
   const renderPortalContent = () => {
+    const pathname = currentPath.toLowerCase();
+
     // 1. Direct Token Candidate AI Chamber Link (?token=...) or Chamber launch button clicked
     if (candidateTokenForChamber) {
       return (
@@ -89,33 +123,43 @@ const AppContent: React.FC = () => {
     }
 
     // 2. Landing Page View (Commercial SaaS Showcase)
-    if (showLandingPage) {
+    if (showLandingPage || pathname === '/landing') {
       return (
         <LandingPage
           onNavigateAuth={(tab) => {
             setAuthInitialTab(tab || 'admin');
             setShowLandingPage(false);
+            if (tab === 'candidate') {
+              navigate('/candidate/auth/login');
+            } else {
+              navigate('/org/auth/login');
+            }
           }}
           onLaunchCandidateChamber={() => {
             setShowLandingPage(false);
+            navigate('/candidate/dashboard');
           }}
           onOpenDemoChamber={() => {
             setShowLandingPage(false);
+            navigate('/candidate/dashboard');
           }}
         />
       );
     }
 
-    // 3. FIRST SCREEN: If user is not authenticated, show Login / Auth Portal (Zero Dashboard Exposure)
+    // 3. UNAUTHENTICATED ROUTE HANDLING (Strict Branding Isolation)
     if (!isAuthenticated || !currentUser) {
+      const isCandidateRoute = pathname.startsWith('/candidate');
       return (
         <GlobalAuthPortal
-          initialTab={authInitialTab}
+          portalMode={isCandidateRoute ? 'candidate' : 'enterprise'}
+          initialTab={isCandidateRoute ? 'candidate' : (authInitialTab || 'admin')}
           onCandidateLaunchChamber={(token) => {
             setCandidateTokenForChamber(token);
+            navigate('/candidate/dashboard');
           }}
           onAdminLoginSuccess={() => {
-            // Re-rendered automatically through AuthContext state change
+            navigate('/org/dashboard');
           }}
         />
       );
@@ -132,6 +176,7 @@ const AppContent: React.FC = () => {
               const cands = AppDataStore.getCandidates();
               if (cands.length > 0) {
                 setCandidateTokenForChamber(cands[0].interviewToken);
+                navigate('/candidate/dashboard');
               }
             }}
             onSwitchToCompany={() => {
@@ -143,7 +188,10 @@ const AppContent: React.FC = () => {
               if (emp) switchPersona(emp.id);
             }}
             onLogout={handleLogout}
-            onOpenLandingPage={() => setShowLandingPage(true)}
+            onOpenLandingPage={() => {
+              setShowLandingPage(true);
+              navigate('/landing');
+            }}
           />
         </RoleGuard>
       );
@@ -163,6 +211,7 @@ const AppContent: React.FC = () => {
               const cands = AppDataStore.getCandidates();
               if (cands.length > 0) {
                 setCandidateTokenForChamber(cands[0].interviewToken);
+                navigate('/candidate/dashboard');
               }
             }}
             onLogout={handleLogout}
@@ -171,7 +220,7 @@ const AppContent: React.FC = () => {
       );
     }
 
-    // Role 3: Candidate Portal
+    // Role 3: Candidate Portal (Strict Isolation, Zero Enterprise Branding)
     if (currentUser.role === 'CANDIDATE') {
       return (
         <RoleGuard allowedRoles={['CANDIDATE', 'SUPER_ADMIN']}>
@@ -203,9 +252,13 @@ const AppContent: React.FC = () => {
                 setCandidateTokenForChamber(cands[0].interviewToken);
               }
             }
+            navigate('/candidate/dashboard');
           }}
           onLogout={handleLogout}
-          onOpenLandingPage={() => setShowLandingPage(true)}
+          onOpenLandingPage={() => {
+            setShowLandingPage(true);
+            navigate('/landing');
+          }}
         />
       </RoleGuard>
     );
@@ -213,6 +266,28 @@ const AppContent: React.FC = () => {
 
   return (
     <>
+      {/* 403 Forbidden / Route Protection Toast Banner */}
+      {accessDeniedMessage && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 max-w-xl w-[92%] animate-in slide-in-from-top duration-300">
+          <div className="p-4 rounded-2xl bg-slate-900/95 border border-rose-500/50 shadow-2xl backdrop-blur-xl flex items-center justify-between gap-3 text-rose-300">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-rose-500/20 text-rose-400">
+                <ShieldAlert className="w-5 h-5" />
+              </div>
+              <span className="text-xs font-semibold leading-relaxed">
+                {accessDeniedMessage}
+              </span>
+            </div>
+            <button
+              onClick={() => setAccessDeniedMessage(null)}
+              className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {renderPortalContent()}
       <AIChatbox />
     </>

@@ -21,6 +21,8 @@ import { ScheduleInterviewModal } from '../components/company-admin/ScheduleInte
 import { EmailSettingsPanel } from '../components/company-admin/EmailSettingsPanel';
 import { InterviewResultsPanel } from '../components/company-admin/InterviewResultsPanel';
 import { LiveVideoConferenceRoom } from '../components/conference/LiveVideoConferenceRoom';
+import { LiveZoomMeetingView } from '../components/conference/LiveZoomMeetingView';
+import { ApiClient } from '../services/apiClient';
 
 import { AppDataStore } from '../services/storage';
 import { Candidate, JobPosition } from '../types';
@@ -80,6 +82,7 @@ export const CompanyAdminPortal: React.FC<CompanyAdminPortalProps> = ({
   const [showRoleMenu, setShowRoleMenu] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [liveZoomMeeting, setLiveZoomMeeting] = useState<{ applicationId: string; candidateName: string; jobTitle: string } | null>(null);
 
   const jobs = AppDataStore.getJobs().filter(j => !currentCompany || j.companyId === currentCompany.id);
   const candidates = AppDataStore.getCandidates().filter(c => !currentCompany || c.companyId === currentCompany.id);
@@ -93,22 +96,30 @@ export const CompanyAdminPortal: React.FC<CompanyAdminPortalProps> = ({
     setActiveTab('live_conference');
   };
 
-  const handleLaunchConferenceForCandidate = (cand: Candidate) => {
+  const handleLaunchConferenceForCandidate = async (cand: Candidate) => {
     const allJobs = AppDataStore.getJobs();
     const targetJob = allJobs.find((j: JobPosition) => j.id === cand.jobId);
     const title = targetJob?.title || cand.currentTitle || 'Lead Robotics Perception Engineer';
-    const roomId = `ROOM-PANEL-${cand.firstName.toUpperCase()}-${cand.lastName.toUpperCase()}-2026`;
-    setConferenceRoom({
-      name: `${cand.firstName} ${cand.lastName}`,
-      title,
-      roomId,
+    
+    // Create live Zoom meeting and broadcast INTERVIEW_MEETING_LAUNCHED to candidate
+    try {
+      await ApiClient.createZoomMeeting(cand.id);
+    } catch (err) {
+      console.warn('Backend Zoom creation notification:', err);
+    }
+
+    setLiveZoomMeeting({
+      applicationId: cand.id,
+      candidateName: `${cand.firstName} ${cand.lastName}`,
+      jobTitle: title
     });
-    setActiveTab('live_conference');
+    setActiveTab('live_zoom_meet');
   };
 
   const navItems = [
     { id: 'dashboard', label: 'Recruiter Dashboard', icon: LayoutDashboard },
     { id: 'candidates', label: 'Candidate Pipeline', icon: Users, badge: `${candidates.length}` },
+    { id: 'live_zoom_meet', label: '1-on-1 Zoom Meet', icon: Video, badge: 'Live Meet' },
     { id: 'live_monitor', label: 'Live Candidate Monitor', icon: Radio, badge: 'Intercom' },
     { id: 'resumes', label: 'AI Resume Shortlist', icon: FileText, badge: 'AI Screen' },
     { id: 'results', label: 'Results & Scorecards', icon: Award, badge: 'AI Score' },
@@ -153,6 +164,18 @@ export const CompanyAdminPortal: React.FC<CompanyAdminPortalProps> = ({
           <LiveMonitorAndRecordingsPanel
             onSelectCandidateScorecard={(id) => setSelectedCandidateId(id)}
             onJoinLiveConference={(roomId, name, title) => handleLaunchMeetingDirect(roomId || 'ROOM-ARDH-ROBOTICS-882', name, title)}
+          />
+        );
+      case 'live_zoom_meet':
+        return (
+          <LiveZoomMeetingView
+            applicationId={liveZoomMeeting?.applicationId || selectedCandidateId || 'app_meet_active'}
+            candidateName={liveZoomMeeting?.candidateName || 'Candidate Interviewee'}
+            jobTitle={liveZoomMeeting?.jobTitle || 'Executive Assessment'}
+            onLeaveMeeting={() => {
+              setLiveZoomMeeting(null);
+              setActiveTab('dashboard');
+            }}
           />
         );
       case 'live_conference':

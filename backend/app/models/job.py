@@ -28,6 +28,9 @@ class Job(Base):
     skill_category = Column(String(32), nullable=False, default='SKILLED') # 'SKILLED', 'UNSKILLED', 'SEMI_SKILLED'
     description = Column(Text, nullable=False)
     required_skills = Column(JSON, nullable=False, default=list) # JSON Array of strings
+    requirements = Column(Text, nullable=True) # Full requirements text
+    ctc = Column(String(100), nullable=True, default="$120k - $160k / ₹18 - 25 LPA") # Compensation details
+    deadline = Column(String(100), nullable=True) # Application deadline
     status = Column(Enum('OPEN', 'CLOSED', 'DRAFT', name='job_status_enum'), nullable=False, default='OPEN')
     total_applicants = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)

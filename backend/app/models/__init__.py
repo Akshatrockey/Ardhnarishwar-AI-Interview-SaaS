@@ -7,6 +7,7 @@ from .job import Job, InterviewRound, QuestionBank, round_questions
 from .candidate import Candidate, InterviewSession, CandidateAnswer, AIEvaluationReport
 from .resume import Resume
 from .ai_version import AIModelVersion
+from .zoom_meeting import InterviewMeeting
 
 __all__ = [
     "Company",
@@ -23,4 +24,5 @@ __all__ = [
     "CandidateAnswer",
     "AIEvaluationReport",
     "AIModelVersion",
+    "InterviewMeeting",
 ]

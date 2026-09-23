@@ -113,11 +113,22 @@ def auto_migrate_schema(target_engine):
         ("security_contact_email", "VARCHAR(255)"),
         ("settings_metadata", "TEXT"),
     ]
+    job_cols = [
+        ("requirements", "TEXT"),
+        ("ctc", "VARCHAR(100) DEFAULT '$120k - $160k / ₹18 - 25 LPA'"),
+        ("deadline", "VARCHAR(100)"),
+    ]
     try:
         with target_engine.connect() as conn:
             for col_name, col_type in new_cols:
                 try:
                     conn.execute(text(f"ALTER TABLE companies ADD COLUMN {col_name} {col_type}"))
+                    conn.commit()
+                except Exception:
+                    pass
+            for col_name, col_type in job_cols:
+                try:
+                    conn.execute(text(f"ALTER TABLE jobs ADD COLUMN {col_name} {col_type}"))
                     conn.commit()
                 except Exception:
                     pass

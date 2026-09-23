@@ -6,6 +6,9 @@ import { HardwareDiagnostic } from '../components/candidate/HardwareDiagnostic';
 import { LiveAIInterviewChamber } from '../components/candidate/LiveAIInterviewChamber';
 import { CandidateScorecardView } from '../components/evaluation/CandidateScorecardView';
 import { LiveVideoConferenceRoom } from '../components/conference/LiveVideoConferenceRoom';
+import { ApplicationTrackerDrawer } from '../components/candidate/ApplicationTrackerDrawer';
+import { LiveZoomMeetingView } from '../components/conference/LiveZoomMeetingView';
+import { realtimeService } from '../services/realtimeService';
 import { ArdhnarishwarLogo } from '../components/common/ArdhnarishwarLogo';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
@@ -42,7 +45,8 @@ import {
   Upload,
   Download,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  Radio
 } from 'lucide-react';
 
 interface CandidatePortalProps {
@@ -92,6 +96,30 @@ export const CandidatePortal: React.FC<CandidatePortalProps> = ({
     return (j.skill_category || 'SKILLED') === jobTrackFilter;
   });
 
+  // Applied Job IDs tracking & duplicate submission prevention
+  const [appliedJobIds, setAppliedJobIds] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem('ardh_applied_jobs');
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+
+  // Application Tracker Drawer state
+  const [isTrackerOpen, setIsTrackerOpen] = useState<boolean>(false);
+  const [activeTrackingAppId, setActiveTrackingAppId] = useState<string>('');
+
+  // Live 1-on-1 Zoom Meeting State & Real-Time Alert
+  const [liveMeetingAlert, setLiveMeetingAlert] = useState<{
+    applicationId: string;
+    candidateName: string;
+    jobTitle: string;
+    zoomMeetingId?: string;
+  } | null>(null);
+  const [isLiveZoomActive, setIsLiveZoomActive] = useState<boolean>(false);
+  const [realtimeJobNotification, setRealtimeJobNotification] = useState<string | null>(null);
+
   // Resume Vault State
   const [resumeData, setResumeData] = useState<UploadedResumeData | null>(null);
   const [isUploadingResume, setIsUploadingResume] = useState<boolean>(false);
@@ -131,6 +159,46 @@ export const CandidatePortal: React.FC<CandidatePortalProps> = ({
   useEffect(() => {
     fetchOpenJobs();
   }, []);
+
+  // Real-Time Cross-Portal Synchronizer: Jobs & Zoom Meeting Invites
+  useEffect(() => {
+    const unsubscribe = realtimeService.subscribe((msg: any) => {
+      // 1. Cross-Portal Real-time Job Publishing Sync
+      if (msg.type === 'JOB_POSTED') {
+        const newJob = msg.payload?.job;
+        if (newJob && newJob.id) {
+          setAvailableJobs((prev) => [newJob, ...prev.filter((j) => j.id !== newJob.id)]);
+          setRealtimeJobNotification(`New Career Opening Published: ${newJob.title} (${newJob.location})`);
+          setTimeout(() => setRealtimeJobNotification(null), 7000);
+        }
+      }
+
+      // 2. Real-time 1-on-1 Live Zoom Interview Invitation
+      if (msg.type === 'INTERVIEW_MEETING_LAUNCHED') {
+        const p = msg.payload;
+        const myId = candidate?.id || currentUser?.id;
+        const myToken = candidate?.interviewToken || tokenInput;
+
+        const isTargetCandidate =
+          (myId && (p.candidate_id === myId || p.application_id === myId)) ||
+          (myToken && p.application_id === myToken) ||
+          (p.candidate_name && candidate && p.candidate_name.toLowerCase().includes(candidate.firstName.toLowerCase()));
+
+        if (isTargetCandidate) {
+          setLiveMeetingAlert({
+            applicationId: p.application_id || myId || 'active_meet',
+            candidateName: p.candidate_name || `${candidate?.firstName} ${candidate?.lastName}`,
+            jobTitle: p.job_title || job?.title || 'Live 1-on-1 Assessment',
+            zoomMeetingId: p.zoom_meeting_id
+          });
+        }
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [candidate, currentUser, tokenInput, job]);
 
   // Auto-detect candidate from logged in user or saved token
   useEffect(() => {
@@ -336,8 +404,8 @@ export const CandidatePortal: React.FC<CandidatePortalProps> = ({
     }
   };
 
-  // Apply for Job Handler
-  const handleApplyForJob = async (jobToApply: JobPosition) => {
+  // Apply for Job Handler with duplicate prevention and timeline sync
+  const handleApplyForJob = async (jobToApply: any) => {
     if (!profileFirstName.trim() || !profileEmail.trim()) {
       setActivePortalTab('profile');
       setProfileSavedMsg('Please complete your Name and Email before submitting an application.');
@@ -356,18 +424,38 @@ export const CandidatePortal: React.FC<CandidatePortalProps> = ({
         resume_id: resumeData?.id
       });
 
-      if (res.data?.success) {
+      // Mark this job as applied in state and storage
+      setAppliedJobIds((prev) => {
+        const next = new Set(prev);
+        next.add(jobToApply.id);
+        try {
+          localStorage.setItem('ardh_applied_jobs', JSON.stringify(Array.from(next)));
+        } catch {}
+        return next;
+      });
+
+      if (res.data?.success || res.data?.already_applied) {
         const token = res.data.interview_token;
-        setTokenInput(token);
-        localStorage.setItem('ardhnarishwar_candidate_token', token);
-        await verifyAndLaunchToken(token, false);
+        const candId = res.data.candidate_id || `cand_${Date.now()}`;
+        if (token) {
+          setTokenInput(token);
+          localStorage.setItem('ardhnarishwar_candidate_token', token);
+          localStorage.setItem('ardh_candidate_token', token);
+          await verifyAndLaunchToken(token, false);
+        }
+        setActiveTrackingAppId(candId);
         setSelectedJobToApply(null);
-        setActivePortalTab('dashboard');
-        alert(`Application submitted successfully! Your invitation token is: ${token}. You can now start your interview.`);
+
+        if (res.data?.already_applied) {
+          alert(`Application already active for ${jobToApply.title}! Tracking timeline opened.`);
+        } else {
+          alert(`Application submitted successfully! Your invitation token is: ${token}.`);
+        }
+        setIsTrackerOpen(true);
       }
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : 'Failed to connect to backend';
-      alert('Application submission error: ' + message);
+      alert('Application error: ' + message);
     }
   };
 
@@ -400,7 +488,7 @@ export const CandidatePortal: React.FC<CandidatePortalProps> = ({
           <ArdhnarishwarLogo size="sm" variant="horizontal" showSubtext={false} />
           <div className="h-4 w-px bg-slate-800 hidden sm:block" />
           <span className="text-xs font-mono text-cyan-400 bg-cyan-950/60 border border-cyan-800/60 px-2.5 py-0.5 rounded-full font-bold">
-            Candidate Portal
+            Ardhnarishwar AI — Candidate Career Portal
           </span>
         </div>
 
@@ -504,6 +592,63 @@ export const CandidatePortal: React.FC<CandidatePortalProps> = ({
       {/* Main Container */}
       <main className="flex-1 p-4 sm:p-6 max-w-7xl w-full mx-auto">
         
+        {/* Real-time Job Publishing Broadcast Notification */}
+        {realtimeJobNotification && (
+          <div className="mb-4 p-3.5 rounded-2xl bg-cyan-950/80 border border-cyan-800 text-cyan-300 text-xs font-bold flex items-center justify-between animate-in slide-in-from-top duration-300 shadow-lg">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-cyan-400" />
+              <span>{realtimeJobNotification}</span>
+            </div>
+            <button
+              onClick={() => {
+                setActivePortalTab('applications');
+                setRealtimeJobNotification(null);
+              }}
+              className="px-3 py-1 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-[11px] font-bold transition shadow-sm"
+            >
+              Explore Opening
+            </button>
+          </div>
+        )}
+
+        {/* Real-time 1-on-1 Zoom Interview Alert Banner */}
+        {liveMeetingAlert && (
+          <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-rose-950/90 via-indigo-950/80 to-slate-900 border-2 border-rose-500/60 shadow-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-in slide-in-from-top duration-300">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-rose-500/20 text-rose-400 animate-pulse">
+                <Radio className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500 text-white animate-pulse">
+                    LIVE NOW
+                  </span>
+                  <h3 className="text-sm font-bold text-white">Live 1-on-1 Zoom Interview Launched by HR</h3>
+                </div>
+                <p className="text-xs text-slate-300 mt-0.5">
+                  Interview session active for <span className="text-cyan-300 font-semibold">{liveMeetingAlert.candidateName}</span> ({liveMeetingAlert.jobTitle})
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 self-end sm:self-auto">
+              <button
+                onClick={() => setIsLiveZoomActive(true)}
+                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 transition flex items-center gap-2 active:scale-95"
+              >
+                <Video className="w-4 h-4" />
+                <span>Join Live Meet Now</span>
+              </button>
+              <button
+                onClick={() => setLiveMeetingAlert(null)}
+                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition text-xs"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* TAB 0: DASHBOARD */}
         {activePortalTab === 'dashboard' && (
           <div className="space-y-6 animate-in fade-in">
@@ -548,7 +693,7 @@ export const CandidatePortal: React.FC<CandidatePortalProps> = ({
             </div>
 
             {/* KPI Metric Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
               <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
                 <div className="text-[11px] font-bold text-slate-400 uppercase">Target Job Position</div>
                 <div className="text-base font-extrabold text-white truncate">
@@ -579,6 +724,21 @@ export const CandidatePortal: React.FC<CandidatePortalProps> = ({
                   {candidate?.interviewToken || 'Apply to generate token'}
                 </div>
                 <div className="text-[11px] text-slate-400">Used for chamber authentication</div>
+              </div>
+
+              <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
+                <div className="text-[11px] font-bold text-slate-400 uppercase">Application Pipeline</div>
+                <button
+                  onClick={() => {
+                    setActiveTrackingAppId(candidate?.id || candidate?.interviewToken || 'app_track_active');
+                    setIsTrackerOpen(true);
+                  }}
+                  className="w-full px-3 py-1.5 rounded-xl bg-indigo-950/80 hover:bg-indigo-900 border border-indigo-800 text-indigo-300 font-bold text-xs flex items-center justify-center gap-1.5 transition"
+                >
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>5-Stage Timeline</span>
+                </button>
+                <div className="text-[11px] text-slate-400">Live recruitment progress</div>
               </div>
 
               <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
@@ -786,7 +946,7 @@ export const CandidatePortal: React.FC<CandidatePortalProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {filteredJobs.map((j) => (
                   <div key={j.id} className="p-6 rounded-3xl bg-slate-900 border border-slate-800 space-y-4 hover:border-slate-700 transition flex flex-col justify-between">
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <div className="flex items-center gap-2">
@@ -805,8 +965,31 @@ export const CandidatePortal: React.FC<CandidatePortalProps> = ({
                           {j.experience_level || 'ENTRY'}
                         </span>
                       </div>
+
                       <p className="text-xs text-slate-400 line-clamp-3">{j.description}</p>
-                      <div className="flex flex-wrap gap-1.5 pt-2">
+
+                      {/* Real-time Metadata: Compensation & Application Deadline */}
+                      <div className="grid grid-cols-2 gap-2 text-[11px] pt-1 text-slate-400 border-t border-slate-800/60">
+                        <div>
+                          <span className="text-slate-500 font-semibold">Compensation: </span>
+                          <span className="text-emerald-400 font-bold">{j.ctc || '$130,000 - $175,000 / Year'}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-500 font-semibold">Deadline: </span>
+                          <span className="text-slate-300 font-mono">{j.deadline || '2026-12-31'}</span>
+                        </div>
+                      </div>
+
+                      {/* Technical Requirements */}
+                      {j.requirements && (
+                        <div className="text-[11px] text-slate-400 bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
+                          <span className="text-slate-500 font-semibold block mb-0.5">Core Requirements:</span>
+                          <span className="line-clamp-2 text-slate-300">{Array.isArray(j.requirements) ? j.requirements.join(' • ') : j.requirements}</span>
+                        </div>
+                      )}
+
+                      {/* Skill Tags */}
+                      <div className="flex flex-wrap gap-1.5 pt-1">
                         {(j.required_skills || []).map((s: string, idx: number) => (
                           <span key={idx} className="px-2 py-0.5 rounded-md bg-slate-950 text-slate-300 text-[10px] border border-slate-800">
                             {s}
@@ -815,15 +998,40 @@ export const CandidatePortal: React.FC<CandidatePortalProps> = ({
                       </div>
                     </div>
 
-                    <div className="pt-4 border-t border-slate-800/80 flex items-center justify-between">
+                    <div className="pt-4 border-t border-slate-800/80 flex items-center justify-between gap-2">
                       <span className="text-xs text-slate-500">{j.location}</span>
-                      <button
-                        onClick={() => handleApplyForJob(j)}
-                        className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-md transition flex items-center gap-1.5"
-                      >
-                        <span>Apply for Track</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </button>
+                      
+                      <div className="flex items-center gap-2">
+                        {appliedJobIds.has(j.id) ? (
+                          <>
+                            <button
+                              disabled
+                              className="px-3.5 py-2 rounded-xl bg-emerald-950/70 border border-emerald-800 text-emerald-400 font-bold text-xs flex items-center gap-1.5 cursor-default"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>Applied</span>
+                            </button>
+                            <button
+                              onClick={() => {
+                                setActiveTrackingAppId(candidate?.id || candidate?.interviewToken || j.id);
+                                setIsTrackerOpen(true);
+                              }}
+                              className="px-3 py-2 rounded-xl bg-indigo-950/80 hover:bg-indigo-900 border border-indigo-800 text-indigo-300 font-bold text-xs flex items-center gap-1.5 transition"
+                            >
+                              <Clock className="w-3.5 h-3.5" />
+                              <span>Track</span>
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => handleApplyForJob(j)}
+                            className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-md transition flex items-center gap-1.5"
+                          >
+                            <span>Apply for Track</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -1006,6 +1214,32 @@ export const CandidatePortal: React.FC<CandidatePortalProps> = ({
           </div>
         )}
       </main>
+
+      {/* 5-Stage Live Recruitment Application Tracker Drawer */}
+      <ApplicationTrackerDrawer
+        applicationId={activeTrackingAppId || candidate?.id || candidate?.interviewToken || ''}
+        isOpen={isTrackerOpen}
+        onClose={() => setIsTrackerOpen(false)}
+        onJoinMeeting={() => {
+          setIsTrackerOpen(false);
+          setIsLiveZoomActive(true);
+        }}
+      />
+
+      {/* 100% Production Live 1-on-1 Zoom Interview Full-Screen View */}
+      {isLiveZoomActive && (
+        <div className="fixed inset-0 z-50 bg-[#070913]">
+          <LiveZoomMeetingView
+            applicationId={liveMeetingAlert?.applicationId || activeTrackingAppId || candidate?.id || candidate?.interviewToken || 'meet_active'}
+            candidateName={candidate ? `${candidate.firstName} ${candidate.lastName}` : (currentUser?.name || 'Candidate Interviewee')}
+            jobTitle={job?.title || 'Live 1-on-1 Assessment'}
+            onLeaveMeeting={() => {
+              setIsLiveZoomActive(false);
+              setLiveMeetingAlert(null);
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 };

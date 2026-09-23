@@ -613,13 +613,15 @@ export interface CreateJobPayload {
   title: string;
   department: string;
   description: string;
-  requirements: string[];
+  requirements?: string[] | string;
+  ctc?: string;
+  deadline?: string;
   experienceLevel: ExperienceLevel;
   skillCategory: SkillCategory;
   location: string;
   jobType: JobType;
-  roundIds: string[];
-  maxCandidates: number;
+  roundIds?: string[];
+  maxCandidates?: number;
   status: JobStatus;
 }
 

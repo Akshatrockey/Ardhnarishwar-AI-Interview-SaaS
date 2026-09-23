@@ -50,20 +50,39 @@ export type AuthFlowState =
 interface GlobalAuthPortalProps {
   onCandidateLaunchChamber: (token: string) => void;
   onAdminLoginSuccess: () => void;
-  initialTab?: 'admin' | 'candidate' | 'company_register' | 'employee_register' | 'superadmin_register';
+  initialTab?: 'admin' | 'candidate' | 'company_register' | 'employee_register' | 'superadmin_register' | 'candidate_signin' | 'candidate_register' | 'company_signin';
+  portalMode?: 'enterprise' | 'candidate';
 }
 
 export const GlobalAuthPortal: React.FC<GlobalAuthPortalProps> = ({
   onCandidateLaunchChamber,
   onAdminLoginSuccess,
-  initialTab
+  initialTab,
+  portalMode
 }) => {
-  const { switchPersona, loginAsCandidate } = useAuth();
+  const { switchPersona, loginAsCandidate, loginOrg, loginCandidateUser } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { language, setLanguage } = useLanguage();
 
+  // Determine active portal mode strictly
+  const isCandidateScope = portalMode === 'candidate' || 
+    (typeof window !== 'undefined' && window.location.pathname.startsWith('/candidate')) ||
+    initialTab === 'candidate' || initialTab === 'candidate_signin' || initialTab === 'candidate_register';
+
   // Primary Architecture Navigation State
-  const [authFlow, setAuthFlow] = useState<AuthFlowState>('LANDING');
+  const [authFlow, setAuthFlow] = useState<AuthFlowState>(() => {
+    if (isCandidateScope) {
+      return (initialTab === 'candidate_register' || (typeof window !== 'undefined' && window.location.pathname.includes('register'))) 
+        ? 'CANDIDATE_REGISTER' 
+        : 'CANDIDATE_SIGNIN';
+    }
+    if (portalMode === 'enterprise' || (typeof window !== 'undefined' && window.location.pathname.startsWith('/org'))) {
+      return (initialTab === 'company_register' || (typeof window !== 'undefined' && window.location.pathname.includes('register')))
+        ? 'COMPANY_REGISTER'
+        : 'COMPANY_SIGNIN';
+    }
+    return 'LANDING';
+  });
   const [showShareModal, setShowShareModal] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
@@ -71,27 +90,26 @@ export const GlobalAuthPortal: React.FC<GlobalAuthPortalProps> = ({
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const portal = params.get('portal') || params.get('tab') || params.get('mode');
+    const path = window.location.pathname.toLowerCase();
     
-    if (portal === 'superadmin' || portal === 'super_admin' || portal === 'admin_login') {
-      setAuthFlow('SUPER_ADMIN_LOGIN');
-    } else if (portal === 'company_signin' || portal === 'company_login') {
-      setAuthFlow('COMPANY_SIGNIN');
-    } else if (portal === 'candidate_signin' || portal === 'candidate_login') {
-      setAuthFlow('CANDIDATE_SIGNIN');
-    } else if (portal === 'company_register' || portal === 'company') {
-      setAuthFlow('COMPANY_REGISTER');
-    } else if (portal === 'candidate_register' || portal === 'candidate') {
+    if (path.startsWith('/candidate/auth/register') || portal === 'candidate_register') {
       setAuthFlow('CANDIDATE_REGISTER');
+    } else if (path.startsWith('/candidate') || portal === 'candidate_signin' || portal === 'candidate_login' || initialTab === 'candidate') {
+      setAuthFlow('CANDIDATE_SIGNIN');
+    } else if (path.startsWith('/org/auth/register') || portal === 'company_register') {
+      setAuthFlow('COMPANY_REGISTER');
+    } else if (path.startsWith('/org') || portal === 'company_signin' || portal === 'company_login') {
+      setAuthFlow('COMPANY_SIGNIN');
+    } else if (portal === 'superadmin' || portal === 'super_admin' || portal === 'admin_login') {
+      setAuthFlow('SUPER_ADMIN_LOGIN');
     } else if (portal === 'signin') {
       setAuthFlow('SIGNIN_SELECT');
     } else if (portal === 'register') {
       setAuthFlow('REGISTER_SELECT');
-    } else if (initialTab === 'candidate') {
-      setAuthFlow('CANDIDATE_SIGNIN');
     } else if (initialTab === 'company_register') {
       setAuthFlow('COMPANY_REGISTER');
     }
-  }, [initialTab]);
+  }, [initialTab, portalMode]);
 
   // Company Sign In State
   const [companyEmail, setCompanyEmail] = useState<string>('');
@@ -166,7 +184,7 @@ export const GlobalAuthPortal: React.FC<GlobalAuthPortalProps> = ({
           setIsLoading(false);
           return;
         }
-        switchPersona(res.user.id);
+        loginOrg(res.user, res.token);
         onAdminLoginSuccess();
       } else {
         setCompanyLoginError(res.message || 'Invalid work email or password. Please verify your company credentials or register a workspace.');
@@ -197,7 +215,7 @@ export const GlobalAuthPortal: React.FC<GlobalAuthPortalProps> = ({
       if (candPassword.trim()) {
         const userRes = await authService.login(inputClean, candPassword, 'CANDIDATE');
         if (userRes.success && userRes.user) {
-          switchPersona(userRes.user.id);
+          loginCandidateUser(userRes.user, userRes.token);
           onAdminLoginSuccess();
           setIsLoading(false);
           return;
@@ -408,6 +426,9 @@ export const GlobalAuthPortal: React.FC<GlobalAuthPortalProps> = ({
           className="cursor-pointer flex items-center gap-3 group transition-transform hover:scale-105"
         >
           <ArdhnarishwarLogo size="md" />
+          <span className="hidden sm:inline-block px-2.5 py-1 rounded-full text-[10px] font-bold font-mono tracking-wider uppercase border bg-slate-900 border-slate-800 text-cyan-300">
+            {isCandidateScope ? 'Candidate Career Portal' : 'Enterprise & Recruiter Portal'}
+          </span>
         </div>
 
         <div className="flex items-center gap-3">
@@ -463,16 +484,20 @@ export const GlobalAuthPortal: React.FC<GlobalAuthPortalProps> = ({
             <div className="text-center space-y-4 max-w-3xl mx-auto">
               <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-cyan-950/80 border border-cyan-700/50 text-cyan-300 text-xs font-bold tracking-wide uppercase shadow-lg shadow-cyan-500/10">
                 <Sparkles className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
-                <span>Enterprise Multi-Tenant AI Platform</span>
+                <span>
+                  {isCandidateScope ? 'Ardhnarishwar AI — Candidate Career Portal' : 'Ardhnarishwar AI — Enterprise & Recruiter Portal'}
+                </span>
               </div>
               <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-white leading-tight">
-                Autonomous AI Interview & <br />
+                {isCandidateScope ? 'Autonomous AI Career Portal &' : 'Autonomous AI Interview &' } <br />
                 <span className="bg-gradient-to-r from-cyan-400 via-teal-300 to-indigo-400 bg-clip-text text-transparent">
-                  Talent Intelligence SaaS
+                  {isCandidateScope ? 'Interview Chamber' : 'Talent Intelligence SaaS'}
                 </span>
               </h1>
               <p className="text-sm sm:text-base text-slate-400 max-w-2xl mx-auto leading-relaxed">
-                Conduct bias-free, conversational AI interviews with real-time video proctoring, speech evaluation, and multi-tenant enterprise hiring pipelines.
+                {isCandidateScope 
+                  ? 'Apply for robotics and software positions, take autonomous AI interviews, and track your application status.'
+                  : 'Conduct bias-free, conversational AI interviews with real-time video proctoring, speech evaluation, and multi-tenant enterprise hiring pipelines.'}
               </p>
 
               {/* Primary Call-to-Actions */}

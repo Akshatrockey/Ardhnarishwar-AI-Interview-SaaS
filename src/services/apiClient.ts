@@ -35,7 +35,19 @@ export class ApiClient {
    */
   private static getToken(): string | null {
     if (typeof window === 'undefined') return null;
-    return localStorage.getItem('ardhnarishwar_token');
+    const path = window.location.pathname.toLowerCase();
+    if (path.startsWith('/candidate')) {
+      return (
+        localStorage.getItem('ardh_candidate_token') ||
+        localStorage.getItem('ardhnarishwar_candidate_token') ||
+        localStorage.getItem('ardhnarishwar_token')
+      );
+    }
+    return (
+      localStorage.getItem('ardh_org_token') ||
+      localStorage.getItem('ardhnarishwar_token') ||
+      localStorage.getItem('ardh_candidate_token')
+    );
   }
 
   /**
@@ -432,5 +444,42 @@ export class ApiClient {
   static async getVideoVaultData(sessionId: string) {
     return this.get(`/api/v1/recordings/${sessionId}/vault-data`);
   }
+
+  // ============================================================================
+  // High-Level Domain Methods: 1-on-1 Live Zoom Interview & Application Tracking
+  // ============================================================================
+
+  /**
+   * Creates a dedicated 1-on-1 Zoom meeting for an enterprise HR interview session.
+   */
+  static async createZoomMeeting(applicationId: string, candidateId?: string, jobId?: string) {
+    return this.post('/api/v1/interviews/zoom-create', {
+      application_id: applicationId,
+      candidate_id: candidateId,
+      job_id: jobId
+    });
+  }
+
+  /**
+   * Retrieves Zoom meeting credentials under strict identity & authorization guard (HR Host / Candidate Attendee).
+   */
+  static async getZoomMeetCredentials(applicationId: string) {
+    return this.get(`/api/v1/interviews/${applicationId}/meet-credentials`);
+  }
+
+  /**
+   * Retrieves the live multi-step recruitment progress timeline for an application.
+   */
+  static async getApplicationTimeline(applicationId: string) {
+    return this.get(`/api/v1/candidates/applications/${applicationId}/timeline`);
+  }
+
+  /**
+   * Retrieves authenticated identity and database state hydration.
+   */
+  static async getMyProfile() {
+    return this.get('/api/v1/auth/me');
+  }
 }
+
 

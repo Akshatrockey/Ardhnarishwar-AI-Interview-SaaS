@@ -56,17 +56,39 @@ async def apply_for_job_endpoint(req: CandidateApplyRequest, db: Session = Depen
     if not job:
         raise HTTPException(status_code=404, detail="The specified Job opening does not exist.")
 
+    email_clean = req.email.strip().lower()
+
+    # Prevent duplicate applications: Check unique combination of job_id and email
+    existing_application = db.query(Candidate).filter(
+        Candidate.job_id == job.id,
+        Candidate.email == email_clean
+    ).first()
+
+    if existing_application:
+        return {
+            "success": True,
+            "already_applied": True,
+            "candidate_id": existing_application.id,
+            "job_id": job.id,
+            "job_title": job.title,
+            "company_id": job.company_id,
+            "interview_token": existing_application.interview_token,
+            "status": existing_application.status,
+            "applied_at": existing_application.applied_at.isoformat(),
+            "message": "You have already submitted an application for this position."
+        }
+
     cand_id = f"cand_{uuid.uuid4().hex[:10]}"
     token_seed = req.first_name.upper().replace(' ', '')
     token = f"TOKEN_{int(time.time()) % 100000}_{token_seed}"
 
     # Check if candidate user exists or create
-    existing_user = db.query(User).filter(User.email == req.email.strip()).first()
+    existing_user = db.query(User).filter(User.email == email_clean).first()
     if not existing_user and req.password:
         new_user = User(
             id=f"usr_{cand_id}",
             company_id=job.company_id,
-            email=req.email.strip().lower(),
+            email=email_clean,
             password_hash=hash_password(req.password),
             name=f"{req.first_name.strip()} {req.last_name.strip()}",
             role="CANDIDATE",
@@ -89,7 +111,7 @@ async def apply_for_job_endpoint(req: CandidateApplyRequest, db: Session = Depen
         job_id=job.id,
         first_name=req.first_name.strip(),
         last_name=req.last_name.strip(),
-        email=req.email.strip().lower(),
+        email=email_clean,
         phone=req.phone.strip() if req.phone else None,
         skill_category=(req.skill_category or "SKILLED").upper(),
         years_of_experience=req.years_of_experience or 0,
@@ -108,6 +130,7 @@ async def apply_for_job_endpoint(req: CandidateApplyRequest, db: Session = Depen
 
     return {
         "success": True,
+        "already_applied": False,
         "candidate_id": new_cand.id,
         "job_id": job.id,
         "job_title": job.title,
@@ -292,3 +315,96 @@ async def delete_candidate_endpoint(
     db.commit()
 
     return {"success": True, "message": f"Candidate {candidate_id} deleted."}
+
+
+@router.get("/applications/{application_id}/timeline")
+async def get_application_timeline_endpoint(
+    application_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Renders the live multi-step recruitment progress timeline:
+    Applied ➔ Under Review ➔ AI Assessment Complete ➔ Selected for Live Interview ➔ Offer / Feedback
+    """
+    app_id = application_id.strip()
+    cand = db.query(Candidate).options(
+        joinedload(Candidate.job),
+        joinedload(Candidate.company),
+        selectinload(Candidate.sessions).joinedload(InterviewSession.ai_report)
+    ).filter(
+        (Candidate.id == app_id) |
+        (Candidate.interview_token == app_id) |
+        (Candidate.email == app_id)
+    ).first()
+
+    if not cand:
+        raise HTTPException(status_code=404, detail="Application record not found.")
+
+    latest_session = cand.sessions[-1] if cand.sessions else None
+    has_completed_assessment = bool(latest_session and latest_session.status == "COMPLETED")
+    score = float(latest_session.overall_score) if latest_session and latest_session.overall_score else None
+
+    # Check for live Zoom meeting
+    from ..models.zoom_meeting import InterviewMeeting
+    meeting = db.query(InterviewMeeting).filter(
+        InterviewMeeting.application_id == cand.id
+    ).order_by(InterviewMeeting.created_at.desc()).first()
+
+    # Build 5-step timeline
+    stages = [
+        {
+            "step": 1,
+            "title": "Application Submitted",
+            "key": "APPLIED",
+            "status": "COMPLETED",
+            "date": cand.applied_at.isoformat() if cand.applied_at else None,
+            "description": f"Applied for {cand.job.title if cand.job else 'Position'}. Resume profile linked."
+        },
+        {
+            "step": 2,
+            "title": "HR Profile Review",
+            "key": "UNDER_REVIEW",
+            "status": "COMPLETED" if cand.status in ("SHORTLISTED", "EVALUATED", "HIRED", "REJECTED") else "CURRENT",
+            "date": cand.applied_at.isoformat() if cand.applied_at else None,
+            "description": f"Profile evaluated for {cand.skill_category} track requirements."
+        },
+        {
+            "step": 3,
+            "title": "Autonomous AI Assessment",
+            "key": "AI_ASSESSMENT",
+            "status": "COMPLETED" if has_completed_assessment else ("CURRENT" if latest_session else "PENDING"),
+            "date": latest_session.completed_at.isoformat() if latest_session and latest_session.completed_at else None,
+            "score": score,
+            "description": f"Overall Score: {score}/100" if score else "Interview chamber invitation active."
+        },
+        {
+            "step": 4,
+            "title": "Live 1-on-1 Interview",
+            "key": "LIVE_INTERVIEW",
+            "status": "COMPLETED" if (meeting and meeting.status == "COMPLETED") else ("CURRENT" if meeting else "PENDING"),
+            "meeting_id": meeting.zoom_meeting_id if meeting else None,
+            "join_url": meeting.join_url if meeting else None,
+            "description": f"Zoom meeting scheduled ({meeting.zoom_meeting_id})" if meeting else "Pending HR live session schedule."
+        },
+        {
+            "step": 5,
+            "title": "Final Decision & Offer",
+            "key": "FINAL_OFFER",
+            "status": "COMPLETED" if cand.status in ("HIRED", "REJECTED") else "PENDING",
+            "outcome": cand.status,
+            "description": f"Candidate status: {cand.status}"
+        }
+    ]
+
+    return {
+        "success": True,
+        "application_id": cand.id,
+        "candidate_name": f"{cand.first_name} {cand.last_name}",
+        "email": cand.email,
+        "job_title": cand.job.title if cand.job else "Position",
+        "company_name": cand.company.name if cand.company else "Enterprise",
+        "current_status": cand.status,
+        "interview_token": cand.interview_token,
+        "stages": stages
+    }
+

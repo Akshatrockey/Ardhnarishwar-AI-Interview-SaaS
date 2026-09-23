@@ -104,7 +104,7 @@ export const JobManager: React.FC<JobManagerProps> = ({ onLaunchLiveInterview })
     refreshData();
   }, [currentCompany]);
 
-  const handleCreateJob = (e: React.FormEvent) => {
+  const handleCreateJob = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentCompany) return;
 
@@ -120,7 +120,7 @@ export const JobManager: React.FC<JobManagerProps> = ({ onLaunchLiveInterview })
       skillCategory,
       description,
       requiredSkills: skillsStr.split(',').map(s => s.trim()).filter(Boolean),
-      status: 'DRAFT', // Starts as draft until validated with questions
+      status: 'OPEN', // Published opening for immediate candidate explorer visibility
       createdAt: new Date().toISOString(),
       roundIds: [roundId],
       totalApplicants: 0,
@@ -148,6 +148,28 @@ export const JobManager: React.FC<JobManagerProps> = ({ onLaunchLiveInterview })
     AppDataStore.saveRounds([newRound, ...allRounds]);
     setJobs([newJob, ...jobs]);
 
+    // Persist to backend database & broadcast real-time JOB_POSTED event
+    try {
+      await ApiClient.createJob({
+        companyId: currentCompany.id,
+        title,
+        department,
+        location,
+        jobType,
+        experienceLevel,
+        skillCategory,
+        description,
+        requirements: skillsStr.split(',').map(s => s.trim()).filter(Boolean),
+        ctc: salaryRange,
+        deadline: deadline,
+        status: 'OPEN',
+        roundIds: [roundId],
+        maxCandidates: openings || 5
+      });
+    } catch (err) {
+      console.warn('Backend database sync notification:', err);
+    }
+
     AppDataStore.logActivity({
       companyId: currentCompany.id,
       actorId: 'usr_admin',
@@ -155,14 +177,14 @@ export const JobManager: React.FC<JobManagerProps> = ({ onLaunchLiveInterview })
       actorRole: 'COMPANY_ADMIN',
       action: 'JOB_CREATED',
       resource: `Job: ${title}`,
-      details: `Created new draft job opening for ${title} (${department})`,
+      details: `Created and published new job opening for ${title} (${department})`,
       ipAddress: '127.0.0.1',
       severity: 'INFO',
     });
 
     setShowAddModal(false);
     resetJobForm();
-    setSuccessMessage(`Job "${title}" created as Draft! Please link interview questions before publishing.`);
+    setSuccessMessage(`Job "${title}" published live! Synced to candidate Explorer and backend database.`);
     setTimeout(() => setSuccessMessage(null), 5000);
   };
 

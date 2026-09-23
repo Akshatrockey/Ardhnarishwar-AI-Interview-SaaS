@@ -31,6 +31,9 @@ class JobCreateRequest(BaseModel):
     experience_level: Optional[str] = "SENIOR"
     skill_category: Optional[str] = "SKILLED" # 'SKILLED', 'UNSKILLED', 'SEMI_SKILLED'
     description: str
+    requirements: Optional[str] = None
+    ctc: Optional[str] = "$120k - $160k / ₹18 - 25 LPA"
+    deadline: Optional[str] = None
     required_skills: List[str] = []
     company_id: Optional[str] = None
     status: Optional[str] = "OPEN"
@@ -43,6 +46,9 @@ class JobUpdateRequest(BaseModel):
     experience_level: Optional[str] = None
     skill_category: Optional[str] = None
     description: Optional[str] = None
+    requirements: Optional[str] = None
+    ctc: Optional[str] = None
+    deadline: Optional[str] = None
     required_skills: Optional[List[str]] = None
     status: Optional[str] = None
 
@@ -100,6 +106,9 @@ async def list_jobs_endpoint(
             "experience_level": j.experience_level,
             "skill_category": j.skill_category or "SKILLED",
             "description": j.description,
+            "requirements": getattr(j, "requirements", None),
+            "ctc": getattr(j, "ctc", "$120k - $160k / ₹18 - 25 LPA"),
+            "deadline": getattr(j, "deadline", None),
             "required_skills": j.required_skills or [],
             "status": j.status,
             "total_applicants": j.total_applicants or 0,
@@ -123,6 +132,7 @@ async def create_job_endpoint(
 ):
     """
     Creates a new real database job opening and auto-provisions its initial interview round.
+    Broadcasts real-time JOB_POSTED event across the platform.
     """
     company_id = req.company_id if current_user.role == "SUPER_ADMIN" and req.company_id else current_user.company_id
     if not company_id:
@@ -144,6 +154,9 @@ async def create_job_endpoint(
         experience_level=req.experience_level or "SENIOR",
         skill_category=(req.skill_category or "SKILLED").upper(),
         description=req.description.strip(),
+        requirements=req.requirements or req.description.strip(),
+        ctc=req.ctc or "$120k - $160k / ₹18 - 25 LPA",
+        deadline=req.deadline or "Open Until Filled",
         required_skills=req.required_skills or [],
         status=req.status or "OPEN",
         total_applicants=0,
@@ -170,12 +183,44 @@ async def create_job_endpoint(
     db.commit()
     db.refresh(new_job)
 
+    # Real-Time WebSocket Broadcast to all candidate explorer sessions
+    try:
+        import time
+        from .realtime import manager
+        comp = db.query(Company).filter(Company.id == new_job.company_id).first()
+        await manager.broadcast_all({
+            "type": "JOB_POSTED",
+            "timestamp": time.time(),
+            "payload": {
+                "id": new_job.id,
+                "company_id": new_job.company_id,
+                "company_name": comp.name if comp else "Enterprise Partner",
+                "title": new_job.title,
+                "department": new_job.department,
+                "location": new_job.location,
+                "job_type": new_job.job_type,
+                "experience_level": new_job.experience_level,
+                "skill_category": new_job.skill_category or "SKILLED",
+                "description": new_job.description,
+                "requirements": new_job.requirements,
+                "ctc": new_job.ctc,
+                "deadline": new_job.deadline,
+                "required_skills": new_job.required_skills or [],
+                "status": new_job.status,
+                "created_at": new_job.created_at.isoformat()
+            }
+        })
+    except Exception:
+        pass
+
     return {
         "success": True,
         "id": new_job.id,
         "company_id": new_job.company_id,
         "title": new_job.title,
         "round_id": primary_round.id,
+        "ctc": new_job.ctc,
+        "deadline": new_job.deadline,
         "status": new_job.status
     }
 

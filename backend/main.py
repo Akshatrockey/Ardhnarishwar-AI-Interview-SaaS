@@ -38,6 +38,7 @@ from app.api.candidates import router as candidates_router
 from app.api.interviews import router as interviews_router
 from app.api.stats import router as stats_router
 from app.api.copilot import router as copilot_router
+from app.api.zoom_interviews import router as zoom_interviews_router
 
 # Initialize tables if not already present
 Base.metadata.create_all(bind=engine)
@@ -108,6 +109,7 @@ app.include_router(candidates_router)
 app.include_router(interviews_router)
 app.include_router(stats_router)
 app.include_router(copilot_router)
+app.include_router(zoom_interviews_router)
 
 
 @app.on_event("startup")
