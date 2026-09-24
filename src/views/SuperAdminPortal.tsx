@@ -15,8 +15,6 @@ import { AITrainingStudio } from '../components/super-admin/AITrainingStudio';
 import { CompanyManager } from '../components/super-admin/CompanyManager';
 import { GlobalAuditLogs } from '../components/super-admin/GlobalAuditLogs';
 import { GlobalQuestionBankManager } from '../components/super-admin/GlobalQuestionBankManager';
-import { SubscriptionPlansManager } from '../components/super-admin/SubscriptionPlansManager';
-
 import { ResumeManagementPanel } from '../components/super-admin/ResumeManagementPanel';
 
 // Enterprise Cross-Module Views
@@ -44,7 +42,6 @@ import {
   Award, 
   Calendar, 
   Mail, 
-  CreditCard, 
   Sparkles, 
   LogOut, 
   UserCheck, 
@@ -182,7 +179,7 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({
     { id: 'resumes', label: 'AI Resume Shortlist', icon: FileText },
     { id: 'results', label: 'Results & Scorecards', icon: Award },
     { id: 'live_monitor', label: 'Live Video Vault', icon: Video },
-    { id: 'plans', label: 'Subscription Plans', icon: CreditCard },
+    { id: 'system_reset', label: 'System Data Clean', icon: Trash2, badge: 'Zero-Mock' },
     { id: 'email_settings', label: 'Email Gateway', icon: Mail },
     { id: 'audit_logs', label: 'Security & Audit Logs', icon: ShieldAlert },
   ];
@@ -218,9 +215,9 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({
       case 'live_conference':
         return (
           <LiveVideoConferenceRoom
-            candidateName={conferenceRoom?.name || 'Priya Sharma'}
-            jobTitle={conferenceRoom?.title || 'Lead Robotics Perception Engineer'}
-            initialRoomId={conferenceRoom?.roomId || 'ROOM-ARDH-HQ-882'}
+            candidateName={conferenceRoom?.name || 'Candidate Interviewee'}
+            jobTitle={conferenceRoom?.title || 'Executive Assessment Track'}
+            initialRoomId={conferenceRoom?.roomId || 'ROOM-LIVE-HQ-PANEL'}
             onLeaveRoom={() => setActiveTab('dashboard')}
           />
         );
@@ -247,8 +244,36 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({
             onJoinLiveConference={(roomId, name, title) => handleLaunchMeetingDirect(roomId || 'ROOM-ARDH-HQ-882', name, title)}
           />
         );
-      case 'plans':
-        return <SubscriptionPlansManager />;
+      case 'system_reset':
+        return (
+          <div className="p-8 rounded-3xl bg-slate-900 border border-slate-800 max-w-2xl mx-auto space-y-6 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center mx-auto">
+              <Trash2 className="w-8 h-8" />
+            </div>
+            <div>
+              <h2 className="text-xl font-extrabold text-white">System Data Maintenance & Reset</h2>
+              <p className="text-xs text-slate-400 mt-1">
+                Zero dummy/mock data compliance control. Super Admin exclusive capability to purge expired sessions or reset local cache.
+              </p>
+            </div>
+            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-left text-xs space-y-2 font-mono">
+              <div className="text-slate-400">Status: <span className="text-emerald-400">Strict Live Database Binding Active</span></div>
+              <div className="text-slate-400">Default Questions Count: <span className="text-cyan-400">0</span></div>
+              <div className="text-slate-400">Pricing / Paywalls: <span className="text-emerald-400">Completely Removed (100% Free)</span></div>
+            </div>
+            <button
+              onClick={() => {
+                if (confirm('Clear local session cache and refresh live telemetry from database?')) {
+                  sessionStorage.clear();
+                  window.location.reload();
+                }
+              }}
+              className="px-6 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition"
+            >
+              Clear Local Session Cache & Refresh
+            </button>
+          </div>
+        );
       case 'email_settings':
         return <EmailSettingsPanel />;
       case 'audit_logs':

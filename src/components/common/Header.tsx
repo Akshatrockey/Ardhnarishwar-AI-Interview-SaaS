@@ -79,10 +79,15 @@ export const Header: React.FC<HeaderProps> = ({
   const [showShareModal, setShowShareModal] = useState(false);
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
 
-  const notifications = [
-    { id: 'n1', title: 'AI Scorecard Dossier Ready', desc: 'Candidate Priya Sharma completed Robotics Perception interview (Score: 92%).', time: '2m ago', unread: true },
-    { id: 'n2', title: 'New Application Received', desc: 'Candidate self-registered for Lead Perception opening.', time: '18m ago', unread: true },
-    { id: 'n3', title: 'Proctoring Telemetry Normal', desc: 'Zero unauthorized tab switches or face occlusions detected.', time: '1h ago', unread: false },
+  const activeCandidates = AppDataStore.getCandidates();
+  const notifications = activeCandidates.length > 0 ? activeCandidates.slice(0, 3).map((c, i) => ({
+    id: `notif_${c.id}`,
+    title: c.status === 'SHORTLISTED' ? 'Candidate Shortlisted for Live Meet' : c.status === 'EVALUATED' ? 'AI Scorecard Dossier Ready' : 'Candidate Application Received',
+    desc: `Candidate ${c.firstName} ${c.lastName} status: ${c.status}.`,
+    time: `${(i + 1) * 4}m ago`,
+    unread: i === 0
+  })) : [
+    { id: 'n_clean', title: 'System Security Normal', desc: 'Zero unauthorized breaches or proctoring flags detected.', time: 'Live', unread: false }
   ];
 
   const users = AppDataStore.getUsers();

@@ -74,7 +74,20 @@ export const CandidatePortal: React.FC<CandidatePortalProps> = ({
   const { theme, toggleTheme } = useTheme();
   const { latencyMs } = useRealtime();
 
-  const [activePortalTab, setActivePortalTab] = useState<'dashboard' | 'resume' | 'applications' | 'chamber' | 'profile' | 'history'>('dashboard');
+  type CandidatePortalTab = 'dashboard' | 'resume' | 'applications' | 'chamber' | 'profile' | 'history';
+
+  const [activePortalTab, setActivePortalTabState] = useState<CandidatePortalTab>(() => {
+    const saved = sessionStorage.getItem('ardh_candidate_active_tab') as CandidatePortalTab;
+    if (['dashboard', 'resume', 'applications', 'chamber', 'profile', 'history'].includes(saved)) {
+      return saved;
+    }
+    return 'dashboard';
+  });
+
+  const setActivePortalTab = (tab: CandidatePortalTab) => {
+    sessionStorage.setItem('ardh_candidate_active_tab', tab);
+    setActivePortalTabState(tab);
+  };
   const [tokenInput, setTokenInput] = useState<string>(initialToken);
   const [candidate, setCandidate] = useState<Candidate | null>(null);
   const [job, setJob] = useState<JobPosition | null>(null);
@@ -173,23 +186,26 @@ export const CandidatePortal: React.FC<CandidatePortalProps> = ({
         }
       }
 
-      // 2. Real-time 1-on-1 Live Zoom Interview Invitation
-      if (msg.type === 'INTERVIEW_MEETING_LAUNCHED') {
+      // 2. Real-time 1-on-1 Live Zoom Interview Invitation & Status Updates
+      if (msg.type === 'INTERVIEW_MEETING_LAUNCHED' || msg.type === 'CANDIDATE_STATUS_UPDATED') {
         const p = msg.payload;
         const myId = candidate?.id || currentUser?.id;
         const myToken = candidate?.interviewToken || tokenInput;
 
         const isTargetCandidate =
           (myId && (p.candidate_id === myId || p.application_id === myId)) ||
-          (myToken && p.application_id === myToken) ||
+          (myToken && (p.application_id === myToken || p.interview_token === myToken)) ||
           (p.candidate_name && candidate && p.candidate_name.toLowerCase().includes(candidate.firstName.toLowerCase()));
 
         if (isTargetCandidate) {
+          if (p.status) {
+            setCandidate((prev) => prev ? { ...prev, status: p.status } : null);
+          }
           setLiveMeetingAlert({
             applicationId: p.application_id || myId || 'active_meet',
-            candidateName: p.candidate_name || `${candidate?.firstName} ${candidate?.lastName}`,
-            jobTitle: p.job_title || job?.title || 'Live 1-on-1 Assessment',
-            zoomMeetingId: p.zoom_meeting_id
+            candidateName: p.candidate_name || `${candidate?.firstName || 'Candidate'} ${candidate?.lastName || ''}`,
+            jobTitle: p.job_title || job?.title || candidate?.currentTitle || 'Live 1-on-1 Assessment',
+            zoomMeetingId: p.meeting_id || p.zoom_meeting_id
           });
         }
       }
@@ -199,6 +215,17 @@ export const CandidatePortal: React.FC<CandidatePortalProps> = ({
       unsubscribe();
     };
   }, [candidate, currentUser, tokenInput, job]);
+
+  // Synchronize shortlisted status with live meeting alert
+  useEffect(() => {
+    if (candidate && candidate.status === 'SHORTLISTED' && !liveMeetingAlert) {
+      setLiveMeetingAlert({
+        applicationId: candidate.id,
+        candidateName: `${candidate.firstName} ${candidate.lastName}`,
+        jobTitle: job?.title || candidate.currentTitle || 'Live 1-on-1 Executive Assessment',
+      });
+    }
+  }, [candidate, job, liveMeetingAlert]);
 
   // Auto-detect candidate from logged in user or saved token
   useEffect(() => {
@@ -305,11 +332,15 @@ export const CandidatePortal: React.FC<CandidatePortalProps> = ({
         }
         return true;
       }
-    } catch (e) {
+    } catch (e: any) {
       console.warn('Backend verification fallback:', e);
+      if (e?.status === 403 || e?.message?.includes('No active application')) {
+        setErrorMessage('No active application found for this role.');
+        return false;
+      }
     }
 
-    // Fallback to local store
+    // Fallback to local store with strict gatekeeping validation
     const allCand = AppDataStore.getCandidates();
     const found = allCand.find(c => 
       c.interviewToken.toUpperCase() === trimmed.toUpperCase() || 
@@ -317,8 +348,35 @@ export const CandidatePortal: React.FC<CandidatePortalProps> = ({
       c.email.toUpperCase() === trimmed.toUpperCase()
     );
 
-    if (!found) {
-      setErrorMessage('Invalid or expired interview token. Please apply for an open job to receive your token.');
+    // Verify an active, approved application exists for the candidate and job
+    if (!found || found.status === 'REJECTED' || !found.jobId) {
+      setErrorMessage('No active application found for this role.');
+      return false;
+    }
+
+    const allJobs = AppDataStore.getJobs();
+    const foundJob = allJobs.find(j => j.id === found.jobId);
+    if (!foundJob) {
+      setErrorMessage('No active application found for this role.');
+      return false;
+    }
+
+    const allRounds = AppDataStore.getRounds();
+    const foundRound = allRounds.find(r => r.jobId === foundJob.id);
+    if (!foundRound) {
+      setErrorMessage('No active application found for this role.');
+      return false;
+    }
+
+    // Strict Question-Job Mapping: Default questions count = 0 (No fallback/placeholder questions)
+    const allQuestions = AppDataStore.getQuestions();
+    const jobQuestions = allQuestions.filter(q => 
+      (foundRound.questionIds && foundRound.questionIds.includes(q.id)) ||
+      (q.roleCategory && foundJob.title && q.roleCategory.toLowerCase() === foundJob.title.toLowerCase())
+    );
+
+    if (jobQuestions.length === 0) {
+      setErrorMessage('No active application found for this role.');
       return false;
     }
 
@@ -330,17 +388,10 @@ export const CandidatePortal: React.FC<CandidatePortalProps> = ({
     setProfileSkills((found.skills || []).join(', '));
     setProfileExperienceYears(found.yearsOfExperience || 0);
 
-    const allJobs = AppDataStore.getJobs();
-    const foundJob = allJobs.find(j => j.id === found.jobId) || allJobs[0];
     setJob(foundJob);
-
-    const allRounds = AppDataStore.getRounds();
-    const foundRound = allRounds.find(r => r.jobId === foundJob?.id) || allRounds[0];
     setRound(foundRound);
 
-    const allQuestions = AppDataStore.getQuestions();
-    const rawQuestions = allQuestions.slice(0, 3);
-    const sanitized = AppDataStore.sanitizeQuestionsForCandidate(rawQuestions);
+    const sanitized = AppDataStore.sanitizeQuestionsForCandidate(jobQuestions);
     setQuestions(sanitized);
 
     if (autoStart) {
@@ -633,7 +684,11 @@ export const CandidatePortal: React.FC<CandidatePortalProps> = ({
 
             <div className="flex items-center gap-2 self-end sm:self-auto">
               <button
-                onClick={() => setIsLiveZoomActive(true)}
+                onClick={() => {
+                  setIsLiveZoomActive(true);
+                  setActivePortalTab('chamber');
+                  setStep('LIVE_CONFERENCE');
+                }}
                 className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 transition flex items-center gap-2 active:scale-95"
               >
                 <Video className="w-4 h-4" />
@@ -646,6 +701,21 @@ export const CandidatePortal: React.FC<CandidatePortalProps> = ({
                 Dismiss
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Fullscreen Active Live Zoom Meeting Session */}
+        {isLiveZoomActive && (
+          <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col animate-in fade-in">
+            <LiveZoomMeetingView
+              applicationId={liveMeetingAlert?.applicationId || candidate?.id || candidate?.interviewToken || tokenInput || 'active_meet'}
+              candidateName={liveMeetingAlert?.candidateName || `${candidate?.firstName || 'Candidate'} ${candidate?.lastName || ''}`}
+              jobTitle={liveMeetingAlert?.jobTitle || job?.title || candidate?.currentTitle || 'Live 1-on-1 Interview'}
+              onLeaveMeeting={() => {
+                setIsLiveZoomActive(false);
+                setStep('SCORECARD_VIEW');
+              }}
+            />
           </div>
         )}
 
@@ -1128,6 +1198,37 @@ export const CandidatePortal: React.FC<CandidatePortalProps> = ({
                   candidateId={candidate?.id || ''}
                   onBack={() => setStep('TOKEN_ENTRY')}
                   onLaunchConference={() => setStep('LIVE_CONFERENCE')}
+                />
+              </div>
+            )}
+
+            {step === 'LIVE_CONFERENCE' && (
+              <div className="space-y-4 animate-in fade-in">
+                <div className="flex items-center justify-between p-4 bg-slate-900 border border-purple-800/80 rounded-2xl shadow-xl">
+                  <div className="flex items-center gap-2 text-xs text-purple-300 font-bold">
+                    <Video className="w-4 h-4 text-purple-400 animate-pulse" />
+                    <span>Live 1-on-1 Executive Video Meeting Active • Shortlisted Candidate Session</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setStep('SCORECARD_VIEW')}
+                      className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
+                    >
+                      View Scorecard
+                    </button>
+                    <button
+                      onClick={() => setStep('TOKEN_ENTRY')}
+                      className="px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-800 transition-colors"
+                    >
+                      Leave Meeting
+                    </button>
+                  </div>
+                </div>
+                <LiveZoomMeetingView
+                  applicationId={candidate?.id || candidate?.interviewToken || tokenInput || 'active_candidate'}
+                  candidateName={`${candidate?.firstName || 'Candidate'} ${candidate?.lastName || ''}`}
+                  jobTitle={job?.title || candidate?.currentTitle || 'Executive Assessment'}
+                  onLeaveMeeting={() => setStep('SCORECARD_VIEW')}
                 />
               </div>
             )}

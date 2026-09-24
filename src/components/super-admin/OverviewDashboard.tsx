@@ -1,17 +1,16 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTenant } from '../../context/TenantContext';
 import { AppDataStore } from '../../services/storage';
+import { ApiClient } from '../../services/apiClient';
 import { 
   Building2, 
-  Users, 
   Bot, 
   Activity, 
   Cpu, 
   TrendingUp, 
   ShieldCheck,
-  CheckCircle2,
-  Clock,
-  Inbox
+  Inbox,
+  RefreshCw
 } from 'lucide-react';
 
 interface OverviewDashboardProps {
@@ -20,10 +19,35 @@ interface OverviewDashboardProps {
 
 export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({ onNavigateTab }) => {
   const { allCompanies } = useTenant();
+  const [liveStats, setLiveStats] = useState<any | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  const fetchLiveTelemetry = async () => {
+    setIsLoading(true);
+    try {
+      const res = await ApiClient.getSuperAdminStats();
+      if (res?.data) {
+        setLiveStats(res.data);
+      }
+    } catch (err) {
+      console.warn('Super Admin stats backend fetch fallback:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLiveTelemetry();
+  }, []);
+
   const candidates = AppDataStore.getCandidates();
   const sessions = AppDataStore.getSessions();
   const questions = AppDataStore.getQuestions();
   const auditLogs = AppDataStore.getAuditLogs().slice(0, 5);
+
+  const totalTenants = liveStats?.total_tenants ?? allCompanies.length;
+  const totalInterviews = liveStats?.total_interviews ?? sessions.length;
+  const totalQuestions = liveStats?.total_questions ?? questions.length;
 
   const evaluatedCount = candidates.filter(c => c.status === 'EVALUATED' || c.status === 'SHORTLISTED' || c.status === 'HIRED').length;
   const shortlistedCount = candidates.filter(c => c.status === 'SHORTLISTED' || c.status === 'HIRED').length;
@@ -46,6 +70,14 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({ onNavigate
 
         <div className="flex items-center gap-3">
           <button
+            onClick={fetchLiveTelemetry}
+            className="p-2.5 rounded-xl border border-slate-700 bg-slate-800 text-slate-300 hover:text-white transition"
+            title="Refresh Live Metrics"
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-cyan-400' : ''}`} />
+          </button>
+
+          <button
             onClick={() => onNavigateTab('resume_vault')}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs bg-cyan-600 hover:bg-cyan-500 text-white shadow-lg shadow-cyan-600/20 transition-all active:scale-95"
           >
@@ -62,7 +94,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({ onNavigate
         </div>
       </div>
 
-      {/* 4 Core Stat Cards */}
+      {/* 4 Core Stat Cards with Skeleton Loading Support */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Stat 1 */}
         <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 shadow-xl space-y-2">
@@ -71,7 +103,11 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({ onNavigate
             <Building2 className="w-4 h-4 text-cyan-400" />
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-white">{allCompanies.length}</span>
+            {isLoading ? (
+              <div className="h-9 w-16 bg-slate-800 rounded animate-pulse" />
+            ) : (
+              <span className="text-3xl font-extrabold text-white">{totalTenants}</span>
+            )}
             <span className="text-xs font-mono text-cyan-400">Tenants</span>
           </div>
           <p className="text-[11px] text-slate-500">Active enterprise workspaces</p>
@@ -84,7 +120,11 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({ onNavigate
             <Bot className="w-4 h-4 text-indigo-400" />
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-white">{sessions.length}</span>
+            {isLoading ? (
+              <div className="h-9 w-16 bg-slate-800 rounded animate-pulse" />
+            ) : (
+              <span className="text-3xl font-extrabold text-white">{totalInterviews}</span>
+            )}
             <span className="text-xs font-mono text-emerald-400">Sessions</span>
           </div>
           <p className="text-[11px] text-slate-500">In-house evaluation engine</p>
@@ -97,7 +137,11 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({ onNavigate
             <TrendingUp className="w-4 h-4 text-emerald-400" />
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-white">{acceptanceRatio}%</span>
+            {isLoading ? (
+              <div className="h-9 w-16 bg-slate-800 rounded animate-pulse" />
+            ) : (
+              <span className="text-3xl font-extrabold text-white">{acceptanceRatio}%</span>
+            )}
             <span className="text-xs font-mono text-cyan-400">Calibrated</span>
           </div>
           <p className="text-[11px] text-slate-500">Benchmark scoring yield</p>
@@ -110,7 +154,11 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({ onNavigate
             <Cpu className="w-4 h-4 text-purple-400" />
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-white">{questions.length}</span>
+            {isLoading ? (
+              <div className="h-9 w-16 bg-slate-800 rounded animate-pulse" />
+            ) : (
+              <span className="text-3xl font-extrabold text-white">{totalQuestions}</span>
+            )}
             <span className="text-xs font-mono text-slate-400">Rubrics</span>
           </div>
           <p className="text-[11px] text-slate-500">Curated benchmark questions</p>

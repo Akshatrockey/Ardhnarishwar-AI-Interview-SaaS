@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Candidate, InterviewSession, JobPosition, Company } from '../../types';
 import { AppDataStore, getVideoBlob } from '../../services/storage';
 import { useTenant } from '../../context/TenantContext';
+import { ScorecardErrorBoundary } from './ScorecardErrorBoundary';
 import { 
   Play, 
   Pause, 
@@ -18,13 +19,13 @@ import {
   Bot, 
   ChevronRight, 
   Tag, 
-  Sparkles,
-  Volume2,
-  Calendar,
-  Layers,
-  TrendingUp,
-  BarChart2,
-  Video
+  Sparkles, 
+  Volume2, 
+  Calendar, 
+  Layers, 
+  TrendingUp, 
+  BarChart2, 
+  Video 
 } from 'lucide-react';
 
 interface CandidateEvaluationViewProps {
@@ -33,7 +34,15 @@ interface CandidateEvaluationViewProps {
   onLaunchConference?: (candidate: Candidate) => void;
 }
 
-export const CandidateEvaluationView: React.FC<CandidateEvaluationViewProps> = ({
+export const CandidateEvaluationView: React.FC<CandidateEvaluationViewProps> = (props) => {
+  return (
+    <ScorecardErrorBoundary onReset={props.onBack}>
+      <CandidateEvaluationViewContent {...props} />
+    </ScorecardErrorBoundary>
+  );
+};
+
+const CandidateEvaluationViewContent: React.FC<CandidateEvaluationViewProps> = ({
   candidateId,
   onBack,
   onLaunchConference,
@@ -91,13 +100,14 @@ export const CandidateEvaluationView: React.FC<CandidateEvaluationViewProps> = (
 
   const activeCandidate = candidates.find(c => c.id === selectedCandidateId) || candidates[0];
   const report = session?.aiReport;
-  const currentAnswer = session?.answers[selectedQuestionIdx] || session?.answers[0];
+  const answersList = Array.isArray(session?.answers) ? session.answers : [];
+  const currentAnswer = answersList[selectedQuestionIdx] || answersList[0] || null;
 
   // Jump Video to Question Timestamp
   const jumpToQuestion = (idx: number) => {
     setSelectedQuestionIdx(idx);
-    if (session && session.answers[idx]) {
-      const startSec = session.answers[idx].videoTimestampStart || 0;
+    if (answersList[idx]) {
+      const startSec = answersList[idx].videoTimestampStart || 0;
       setCurrentTimeSec(startSec);
       if (videoRef.current) {
         videoRef.current.currentTime = startSec;
@@ -354,7 +364,7 @@ export const CandidateEvaluationView: React.FC<CandidateEvaluationViewProps> = (
                 Click Question to Seek Video
               </div>
 
-              {session?.answers.map((ans, idx) => {
+              {answersList.map((ans, idx) => {
                 const isSelected = selectedQuestionIdx === idx;
                 return (
                   <button

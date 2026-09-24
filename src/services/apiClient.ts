@@ -101,12 +101,18 @@ export class ApiClient {
 
       if (!res.ok) {
         const errorDetail =
-          typeof data === 'object' && data !== null && 'detail' in data
+          typeof data === 'object' && data !== null && 'message' in data && (data as any).message
+            ? String((data as any).message)
+            : typeof data === 'object' && data !== null && 'detail' in data
             ? String((data as { detail: unknown }).detail)
             : typeof data === 'string' && data.length > 0
             ? data
             : `Request failed with status ${res.status}`;
-        return { error: errorDetail, status: res.status };
+        return { error: errorDetail, data: (data as any)?.data, status: res.status };
+      }
+
+      if (typeof data === 'object' && data !== null && (data as any).success === false) {
+        return { error: (data as any).message || 'Operation failed', data: (data as any).data, status: res.status };
       }
 
       return { data: data as T, status: res.status };
@@ -479,6 +485,37 @@ export class ApiClient {
    */
   static async getMyProfile() {
     return this.get('/api/v1/auth/me');
+  }
+
+  /**
+   * Generates Zoom SDK JWT signature securely on the backend.
+   */
+  static async getZoomSignature(meetingNumber: string, role: number = 0) {
+    return this.post('/api/v1/interviews/zoom-signature', {
+      meetingNumber,
+      role
+    });
+  }
+
+  /**
+   * Retrieves candidate career dashboard statistics directly from live database.
+   */
+  static async getCandidateStats() {
+    return this.get('/api/v1/stats/candidate');
+  }
+
+  /**
+   * Retrieves full candidate profile, evaluation reports, and interview sessions.
+   */
+  static async getCandidateDetails(candidateId: string) {
+    return this.get<any>(`/api/v1/candidates/${candidateId}`);
+  }
+
+  /**
+   * Refreshes active JWT session token for persistent sessions.
+   */
+  static async refreshToken() {
+    return this.post('/api/v1/auth/refresh');
   }
 }
 

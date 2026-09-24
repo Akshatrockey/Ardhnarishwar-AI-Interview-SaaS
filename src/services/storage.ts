@@ -1,16 +1,6 @@
 // Persistent Client-Side Data Store & IndexedDB Video Chunk Manager (Production Real-Time)
 import { Company, User, JobPosition, InterviewRound, Question, Candidate, InterviewSession, AuditLog, SubscriptionPlan, AIEngineHyperparams } from '../types';
 import { DEFAULT_AI_HYPERPARAMS } from '../ai-engine/scoringPipeline';
-import {
-  INITIAL_COMPANIES,
-  INITIAL_USERS,
-  INITIAL_JOBS,
-  INITIAL_ROUNDS,
-  ALL_INITIAL_QUESTIONS,
-  INITIAL_CANDIDATES,
-  INITIAL_SESSIONS,
-  INITIAL_AUDIT_LOGS,
-} from '../ai-engine/datasets/seedData';
 
 /**
  * Universal cross-browser copy to clipboard with fallback for unsecured contexts and iframes
@@ -144,7 +134,7 @@ function setStored<T>(key: string, val: T): void {
 }
 
 export class AppDataStore {
-  // Initialize production state with rich enterprise seed records when empty
+  // Production zero-dummy-data initialization: 100% live database backed
   static init(): void {
     if (typeof window !== 'undefined' && window.localStorage) {
       const currentVer = localStorage.getItem(SCHEMA_VERSION_KEY);
@@ -159,44 +149,30 @@ export class AppDataStore {
       }
     }
 
-    const storedCompanies = getStored<Company[] | null>(STORAGE_KEYS.COMPANIES, null);
-    if (!storedCompanies || storedCompanies.length === 0) {
-      setStored(STORAGE_KEYS.COMPANIES, INITIAL_COMPANIES);
+    // Default to clean empty structures (Zero Dummy/Mock Data Policy)
+    if (getStored<Company[] | null>(STORAGE_KEYS.COMPANIES, null) === null) {
+      setStored(STORAGE_KEYS.COMPANIES, []);
     }
-
-    const storedUsers = getStored<User[] | null>(STORAGE_KEYS.USERS, null);
-    if (!storedUsers || storedUsers.length === 0) {
-      setStored(STORAGE_KEYS.USERS, INITIAL_USERS);
+    if (getStored<User[] | null>(STORAGE_KEYS.USERS, null) === null) {
+      setStored(STORAGE_KEYS.USERS, []);
     }
-
-    const storedJobs = getStored<JobPosition[] | null>(STORAGE_KEYS.JOBS, null);
-    if (!storedJobs || storedJobs.length === 0) {
-      setStored(STORAGE_KEYS.JOBS, INITIAL_JOBS);
+    if (getStored<JobPosition[] | null>(STORAGE_KEYS.JOBS, null) === null) {
+      setStored(STORAGE_KEYS.JOBS, []);
     }
-
-    const storedRounds = getStored<InterviewRound[] | null>(STORAGE_KEYS.ROUNDS, null);
-    if (!storedRounds || storedRounds.length === 0) {
-      setStored(STORAGE_KEYS.ROUNDS, INITIAL_ROUNDS);
+    if (getStored<InterviewRound[] | null>(STORAGE_KEYS.ROUNDS, null) === null) {
+      setStored(STORAGE_KEYS.ROUNDS, []);
     }
-
-    const storedQuestions = getStored<Question[] | null>(STORAGE_KEYS.QUESTIONS, null);
-    if (!storedQuestions || storedQuestions.length === 0) {
-      setStored(STORAGE_KEYS.QUESTIONS, ALL_INITIAL_QUESTIONS);
+    if (getStored<Question[] | null>(STORAGE_KEYS.QUESTIONS, null) === null) {
+      setStored(STORAGE_KEYS.QUESTIONS, []);
     }
-
-    const storedCandidates = getStored<Candidate[] | null>(STORAGE_KEYS.CANDIDATES, null);
-    if (!storedCandidates || storedCandidates.length === 0) {
-      setStored(STORAGE_KEYS.CANDIDATES, INITIAL_CANDIDATES);
+    if (getStored<Candidate[] | null>(STORAGE_KEYS.CANDIDATES, null) === null) {
+      setStored(STORAGE_KEYS.CANDIDATES, []);
     }
-
-    const storedSessions = getStored<InterviewSession[] | null>(STORAGE_KEYS.SESSIONS, null);
-    if (!storedSessions || storedSessions.length === 0) {
-      setStored(STORAGE_KEYS.SESSIONS, INITIAL_SESSIONS);
+    if (getStored<InterviewSession[] | null>(STORAGE_KEYS.SESSIONS, null) === null) {
+      setStored(STORAGE_KEYS.SESSIONS, []);
     }
-
-    const storedAuditLogs = getStored<AuditLog[] | null>(STORAGE_KEYS.AUDIT_LOGS, null);
-    if (!storedAuditLogs || storedAuditLogs.length === 0) {
-      setStored(STORAGE_KEYS.AUDIT_LOGS, INITIAL_AUDIT_LOGS);
+    if (getStored<AuditLog[] | null>(STORAGE_KEYS.AUDIT_LOGS, null) === null) {
+      setStored(STORAGE_KEYS.AUDIT_LOGS, []);
     }
 
     if (getStored(STORAGE_KEYS.HYPERPARAMS, null) === null) {

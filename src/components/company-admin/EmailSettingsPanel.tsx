@@ -37,7 +37,7 @@ export const EmailSettingsPanel: React.FC = () => {
     localStorage.setItem('ejs_admin_email', adminEmail);
 
     AppDataStore.logActivity({
-      companyId: 'comp_cyberdyne',
+      companyId: 'comp_ardhnarishwar',
       actorId: 'admin_usr',
       actorName: 'Security Admin',
       actorRole: 'SUPER_ADMIN',

@@ -6,12 +6,16 @@ Security: Zero-Trust Cryptographic JWT Auth, Anti-Spoofing Dependency Guards, Ac
 
 from fastapi import FastAPI, Depends, HTTPException, status, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
 import time
 import os
 import uuid
+import logging
 
 from sqlalchemy.orm import Session
 from app.core.config import settings
@@ -39,6 +43,8 @@ from app.api.interviews import router as interviews_router
 from app.api.stats import router as stats_router
 from app.api.copilot import router as copilot_router
 from app.api.zoom_interviews import router as zoom_interviews_router
+
+logger = logging.getLogger("ardhnarishwar")
 
 # Initialize tables if not already present
 Base.metadata.create_all(bind=engine)
@@ -99,6 +105,57 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type", "Accept", "Range", "Origin"],
     expose_headers=["Content-Range", "Accept-Ranges", "Content-Length"]
 )
+
+# Cross-Origin-Opener-Policy & Cross-Origin-Embedder-Policy Middleware for Media Streams
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+    response.headers["Cross-Origin-Embedder-Policy"] = "credentialless"
+    return response
+
+# Standardized Global Exception Handlers
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "success": False,
+            "data": None,
+            "message": exc.detail if isinstance(exc.detail, str) else str(exc.detail),
+            "errors": [exc.detail] if isinstance(exc.detail, str) else exc.detail
+        }
+    )
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    error_list = []
+    for err in exc.errors():
+        field = " -> ".join([str(loc) for loc in err.get("loc", [])])
+        msg = err.get("msg", "Invalid value")
+        error_list.append(f"{field}: {msg}")
+    return JSONResponse(
+        status_code=422,
+        content={
+            "success": False,
+            "data": None,
+            "message": f"Validation failed: {', '.join(error_list) if error_list else 'Invalid payload'}",
+            "errors": exc.errors()
+        }
+    )
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.exception(f"Unhandled server exception on {request.url.path}: {exc}")
+    return JSONResponse(
+        status_code=500,
+        content={
+            "success": False,
+            "data": None,
+            "message": "Internal server error. Safe resilience guard activated.",
+            "errors": [str(exc)]
+        }
+    )
 
 # Mount All Modular Routers
 app.include_router(recordings_router)
@@ -179,12 +236,15 @@ class LoginRequest(BaseModel):
     password: str
 
 class LoginResponse(BaseModel):
+    success: bool = True
+    message: str = "Authentication successful."
     access_token: str
     token_type: str = "bearer"
     user_id: str
     role: str
-    company_id: Optional[str]
+    company_id: Optional[str] = None
     name: str
+    data: Optional[Dict[str, Any]] = None
 
 @app.post(
     "/api/v1/auth/login",
@@ -209,19 +269,29 @@ async def login_endpoint(req: LoginRequest, db: Session = Depends(get_db)):
         user_id=user.id,
         role=user.role,
         company_id=user.company_id,
-        expires_minutes=60
+        expires_minutes=120
     )
 
     user.last_login_at = datetime.now(timezone.utc)
     db.commit()
 
     return {
+        "success": True,
+        "message": "Authentication successful.",
         "access_token": token,
         "token_type": "bearer",
         "user_id": user.id,
         "role": user.role,
         "company_id": user.company_id,
-        "name": user.name
+        "name": user.name,
+        "data": {
+            "access_token": token,
+            "token_type": "bearer",
+            "user_id": user.id,
+            "role": user.role,
+            "company_id": user.company_id,
+            "name": user.name
+        }
     }
 
 
@@ -263,17 +333,18 @@ class CandidateVerifyRequest(BaseModel):
     tags=["Security & Auth"]
 )
 async def candidate_verify_endpoint(req: CandidateVerifyRequest, db: Session = Depends(get_db)):
-    cand = db.query(Candidate).filter(
+    cand = db.query(Candidate).options(joinedload(Candidate.job)).filter(
         (Candidate.interview_token == req.token_or_id) | 
         (Candidate.id == req.token_or_id) |
         (Candidate.email == req.token_or_id)
     ).first()
-    if not cand:
+    if not cand or not cand.job or cand.status == 'REJECTED':
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Candidate record not found for the provided token or ID."
+            detail="No active application found for this role."
         )
     return {
+        "success": True,
         "id": cand.id,
         "company_id": cand.company_id,
         "job_id": cand.job_id,
@@ -293,17 +364,18 @@ async def candidate_verify_get_endpoint(token: Optional[str] = None, token_or_id
     t = token or token_or_id
     if not t:
         raise HTTPException(status_code=400, detail="Token or ID parameter is required.")
-    cand = db.query(Candidate).filter(
+    cand = db.query(Candidate).options(joinedload(Candidate.job)).filter(
         (Candidate.interview_token == t) | 
         (Candidate.id == t) |
         (Candidate.email == t)
     ).first()
-    if not cand:
+    if not cand or not cand.job or cand.status == 'REJECTED':
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Candidate record not found for the provided token or ID."
+            detail="No active application found for this role."
         )
     return {
+        "success": True,
         "id": cand.id,
         "company_id": cand.company_id,
         "job_id": cand.job_id,
@@ -312,6 +384,32 @@ async def candidate_verify_get_endpoint(token: Optional[str] = None, token_or_id
         "email": cand.email,
         "status": cand.status,
         "interview_token": cand.interview_token
+    }
+
+@app.post(
+    "/api/v1/auth/refresh",
+    tags=["Security & Auth"]
+)
+async def refresh_token_endpoint(
+    current_user: AuthenticatedIdentity = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Renews active JWT token for seamless session persistence across reloads.
+    """
+    new_token = create_access_token(
+        user_id=current_user.id,
+        role=current_user.role,
+        company_id=current_user.company_id,
+        expires_minutes=120
+    )
+    return {
+        "success": True,
+        "access_token": new_token,
+        "token_type": "bearer",
+        "user_id": current_user.id,
+        "role": current_user.role,
+        "company_id": current_user.company_id
     }
 
 

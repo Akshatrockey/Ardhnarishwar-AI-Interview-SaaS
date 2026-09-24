@@ -33,12 +33,14 @@ import {
 
 interface LandingPageProps {
   onNavigateAuth: (tab?: 'admin' | 'candidate' | 'company_register' | 'employee_register') => void;
+  onNavigateSuperAdmin?: () => void;
   onLaunchCandidateChamber: () => void;
   onOpenDemoChamber: () => void;
 }
 
 export const LandingPage: React.FC<LandingPageProps> = ({
   onNavigateAuth,
+  onNavigateSuperAdmin,
   onLaunchCandidateChamber,
   onOpenDemoChamber
 }) => {
@@ -120,63 +122,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     }
   ];
 
-  const pricingTiers = [
-    {
-      name: 'Starter Tier',
-      price: '$0',
-      period: 'Forever Free',
-      badge: 'Prototyping & Pilots',
-      desc: 'Ideal for small startups and engineering departments testing AI hiring.',
-      features: [
-        'Up to 3 Active Job Openings',
-        '50 AI Interviews / Month',
-        'Candidate Video Vault & Scoring',
-        'Standard Semantic Resume Screener',
-        'Community Support'
-      ],
-      cta: 'Get Started Free',
-      highlighted: false,
-      tab: 'company_register' as const
-    },
-    {
-      name: 'Growth Enterprise',
-      price: '$199',
-      period: 'per month',
-      badge: 'Most Popular',
-      desc: 'Complete autonomous interview chamber and HRMS suite for growing companies.',
-      features: [
-        'Up to 25 Active Job Openings',
-        '1,000 AI Interviews / Month',
-        'Adaptive AI Follow-Up Question Engine',
-        'Live Video Panel Conference Rooms',
-        'Full HRMS & Employee Shift Attendance',
-        'AI Training Studio & Custom Rubrics',
-        'Priority SLA Support'
-      ],
-      cta: 'Start 14-Day Free Trial',
-      highlighted: true,
-      tab: 'company_register' as const
-    },
-    {
-      name: 'Enterprise Robotics & AI',
-      price: 'Custom',
-      period: 'Tailored SLA',
-      badge: 'Global Scale',
-      desc: 'Dedicated tenant clusters, custom AI model fine-tuning, and on-premise deployments.',
-      features: [
-        'Unlimited Job Positions & Interviews',
-        'Custom In-House AI Vectorizer Tuning',
-        'Dedicated MySQL & Redis Cluster Setup',
-        'Custom SSO (SAML / Okta / Azure AD)',
-        'Zero-Trust Immutable Audit Vault',
-        '24/7 Dedicated Account Architect'
-      ],
-      cta: 'Contact Sales / Super Admin',
-      highlighted: false,
-      tab: 'admin' as const
-    }
-  ];
-
   return (
     <div className="min-h-screen bg-[#070913] text-slate-100 flex flex-col font-sans selection:bg-cyan-500 selection:text-black">
       
@@ -197,7 +142,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <a href="#features" className="hover:text-cyan-400 transition-colors">Platform Features</a>
             <a href="#workflow" className="hover:text-cyan-400 transition-colors">How It Works</a>
             <a href="#ai-engine" className="hover:text-cyan-400 transition-colors">AI Engine</a>
-            <a href="#pricing" className="hover:text-cyan-400 transition-colors">Pricing</a>
+            <a href="#architecture" className="hover:text-cyan-400 transition-colors">Architecture</a>
             <a href="#faq" className="hover:text-cyan-400 transition-colors">FAQ</a>
           </nav>
 
@@ -207,6 +152,20 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-300 hover:text-white bg-slate-900 border border-slate-800 hover:border-slate-700 transition-all"
             >
               Candidate Portal
+            </button>
+            <button
+              onClick={() => {
+                if (onNavigateSuperAdmin) {
+                  onNavigateSuperAdmin();
+                } else {
+                  onNavigateAuth('admin');
+                }
+              }}
+              className="px-3 py-1.5 rounded-xl text-xs font-bold text-amber-300 hover:text-amber-200 bg-amber-950/50 hover:bg-amber-900/60 border border-amber-600/40 transition-all flex items-center gap-1.5"
+              title="Super Administrator Master Portal"
+            >
+              <Lock className="w-3.5 h-3.5 text-amber-400" />
+              <span>Super Admin HQ</span>
             </button>
             <button
               onClick={() => onNavigateAuth('admin')}
@@ -444,64 +403,102 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </div>
       </section>
 
-      {/* Pricing Section */}
-      <section id="pricing" className="relative z-10 py-20 px-4 sm:px-8 max-w-7xl mx-auto space-y-12">
+      {/* Enterprise Architecture & Open Platform Section */}
+      <section id="architecture" className="relative z-10 py-20 px-4 sm:px-8 max-w-7xl mx-auto space-y-12">
         <div className="text-center space-y-3 max-w-2xl mx-auto">
-          <h2 className="text-xs font-bold uppercase tracking-widest text-cyan-400">Simple & Predictable</h2>
+          <h2 className="text-xs font-bold uppercase tracking-widest text-cyan-400">Enterprise Ready</h2>
           <h3 className="text-3xl sm:text-4xl font-extrabold text-white">
-            Transparent Enterprise Pricing
+            100% Open Enterprise Platform
           </h3>
           <p className="text-xs sm:text-sm text-slate-300">
-            Scale seamlessly from startup hiring to global enterprise robotics and software teams.
+            Unrestricted access to autonomous robotics hiring, AI interview chambers, real-time proctoring, and comprehensive analytics.
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {pricingTiers.map((tier, idx) => (
-            <div
-              key={idx}
-              className={`rounded-3xl p-6 sm:p-8 flex flex-col justify-between space-y-6 transition-all ${
-                tier.highlighted
-                  ? 'bg-gradient-to-b from-slate-900 via-indigo-950/40 to-slate-900 border-2 border-cyan-500/60 shadow-2xl shadow-cyan-500/10 relative scale-105'
-                  : 'bg-slate-900/70 border border-slate-800'
-              }`}
-            >
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold font-mono text-cyan-400 uppercase">{tier.badge}</span>
+          <div className="rounded-3xl p-6 sm:p-8 flex flex-col justify-between space-y-6 bg-slate-900/70 border border-slate-800 hover:border-cyan-500/40 transition-all">
+            <div className="space-y-4">
+              <span className="text-xs font-bold font-mono text-cyan-400 uppercase">AUTONOMOUS SCREENING</span>
+              <h4 className="text-xl font-extrabold text-white">Unrestricted AI Chambers</h4>
+              <p className="text-xs text-slate-300">Run unlimited autonomous interviews with instant biometric sentiment analysis, NLP vector scoring, and proctoring telemetry.</p>
+              <div className="pt-4 border-t border-slate-800/80 space-y-2.5">
+                <div className="flex items-center gap-2 text-xs text-slate-200">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                  <span>Zero per-interview fees</span>
                 </div>
-
-                <div>
-                  <h4 className="text-xl font-extrabold text-white">{tier.name}</h4>
-                  <div className="mt-2 flex items-baseline gap-1.5">
-                    <span className="text-3xl sm:text-4xl font-black text-white">{tier.price}</span>
-                    <span className="text-xs text-slate-300 font-mono">/ {tier.period}</span>
-                  </div>
-                  <p className="text-xs text-slate-300 mt-2">{tier.desc}</p>
+                <div className="flex items-center gap-2 text-xs text-slate-200">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                  <span>Real-time speech WPM & fluency</span>
                 </div>
-
-                <div className="pt-4 border-t border-slate-800/80 space-y-2.5">
-                  {tier.features.map((feat, fIdx) => (
-                    <div key={fIdx} className="flex items-center gap-2 text-xs text-slate-200">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                      <span>{feat}</span>
-                    </div>
-                  ))}
+                <div className="flex items-center gap-2 text-xs text-slate-200">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                  <span>Mil-spec proctoring & tab-switch audit</span>
                 </div>
               </div>
-
-              <button
-                onClick={() => onNavigateAuth(tier.tab)}
-                className={`w-full py-3 rounded-xl text-xs font-extrabold transition-all ${
-                  tier.highlighted
-                    ? 'bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white shadow-lg shadow-cyan-500/25'
-                    : 'bg-slate-800 hover:bg-slate-700 text-white'
-                }`}
-              >
-                {tier.cta}
-              </button>
             </div>
-          ))}
+            <button
+              onClick={() => onNavigateAuth('company_register')}
+              className="w-full py-3 rounded-xl text-xs font-extrabold bg-slate-800 hover:bg-slate-700 text-white transition-all"
+            >
+              Deploy Candidate Chamber
+            </button>
+          </div>
+
+          <div className="rounded-3xl p-6 sm:p-8 flex flex-col justify-between space-y-6 bg-gradient-to-b from-slate-900 via-indigo-950/40 to-slate-900 border-2 border-cyan-500/60 shadow-2xl shadow-cyan-500/10 relative scale-105">
+            <div className="space-y-4">
+              <span className="text-xs font-bold font-mono text-cyan-400 uppercase">COLLABORATIVE INTERVIEWS</span>
+              <h4 className="text-xl font-extrabold text-white">Embedded 1-on-1 Zoom</h4>
+              <p className="text-xs text-slate-300">Seamless Web SDK in-app video meetings with automatic cryptographic role-based host and attendee assignment.</p>
+              <div className="pt-4 border-t border-slate-800/80 space-y-2.5">
+                <div className="flex items-center gap-2 text-xs text-slate-200">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                  <span>In-app viewport embedding</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-slate-200">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                  <span>Zero redirects or popups</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-slate-200">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                  <span>Synchronized live scorecard review</span>
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => onNavigateAuth('company_register')}
+              className="w-full py-3 rounded-xl text-xs font-extrabold bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white shadow-lg shadow-cyan-500/25 transition-all"
+            >
+              Start Free Enterprise Workspace
+            </button>
+          </div>
+
+          <div className="rounded-3xl p-6 sm:p-8 flex flex-col justify-between space-y-6 bg-slate-900/70 border border-slate-800 hover:border-cyan-500/40 transition-all">
+            <div className="space-y-4">
+              <span className="text-xs font-bold font-mono text-cyan-400 uppercase">HIGH-PRECISION PIPELINE</span>
+              <h4 className="text-xl font-extrabold text-white">Semantic AI Screening</h4>
+              <p className="text-xs text-slate-300">Automated multi-format resume parsing and concept alignment against specific job openings with instant ranking.</p>
+              <div className="pt-4 border-t border-slate-800/80 space-y-2.5">
+                <div className="flex items-center gap-2 text-xs text-slate-200">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                  <span>PDF, DOC, DOCX document extraction</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-slate-200">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                  <span>Missing competencies radar</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-slate-200">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                  <span>Complete audit log traceability</span>
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => onNavigateAuth('candidate')}
+              className="w-full py-3 rounded-xl text-xs font-extrabold bg-slate-800 hover:bg-slate-700 text-white transition-all"
+            >
+              Candidate Self-Service
+            </button>
+          </div>
         </div>
       </section>
 
@@ -580,6 +577,20 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <span>WebSocket Live Bus</span>
             <span>•</span>
             <span>In-House AI Engine</span>
+            <span>•</span>
+            <button
+              onClick={() => {
+                if (onNavigateSuperAdmin) {
+                  onNavigateSuperAdmin();
+                } else {
+                  onNavigateAuth('admin');
+                }
+              }}
+              className="text-amber-400 hover:text-amber-300 font-semibold flex items-center gap-1.5 transition-colors"
+            >
+              <Lock className="w-3.5 h-3.5 text-amber-400" />
+              <span>Super Admin HQ</span>
+            </button>
           </div>
 
           <div className="text-slate-300 font-mono text-[11px]">

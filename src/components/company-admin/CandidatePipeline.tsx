@@ -110,7 +110,7 @@ export const CandidatePipeline: React.FC<CandidatePipelineProps> = ({
     }
 
     const targetJob = jobs.find(j => j.id === assignedJobId) || jobs[0];
-    const companyId = currentCompany?.id || targetJob?.companyId || 'comp_cyberdyne';
+    const companyId = currentCompany?.id || targetJob?.companyId || 'comp_ardhnarishwar';
 
     setInviteSubmitting(true);
     const cleanFirstName = firstName.trim();

@@ -31,9 +31,10 @@ const AppContent: React.FC = () => {
   const [showLandingPage, setShowLandingPage] = useState<boolean>(() => {
     if (typeof window === 'undefined') return true;
     const path = window.location.pathname.toLowerCase();
-    const isAuth = path.includes('/auth') || path.includes('/login') || path.includes('/register');
+    const isAuth = path.includes('/auth') || path.includes('/login') || path.includes('/register') || path.startsWith('/admin') || path.startsWith('/superadmin') || path.includes('/dashboard');
     const hasToken = new URLSearchParams(window.location.search).get('token');
-    return !isAuth && !hasToken;
+    const isPortalParam = new URLSearchParams(window.location.search).get('portal');
+    return !isAuth && !hasToken && !isPortalParam;
   });
   const [authInitialTab, setAuthInitialTab] = useState<'admin' | 'candidate' | 'company_register' | 'employee_register'>('admin');
   const [accessDeniedMessage, setAccessDeniedMessage] = useState<string | null>(null);
@@ -55,6 +56,7 @@ const AppContent: React.FC = () => {
       const pageParam = params.get('page');
       const isAuthRoute = pathname.includes('/auth') || pathname.includes('/login') || pathname.includes('/register');
       const isDashboardRoute = pathname.includes('/dashboard');
+      const isAdminRoute = pathname.startsWith('/admin') || pathname.startsWith('/superadmin') || params.get('portal') === 'superadmin' || params.get('portal') === 'super_admin';
 
       // 0. Website Frontend (Landing Page) by Default for root '/' and non-auth paths
       if (token) {
@@ -64,7 +66,17 @@ const AppContent: React.FC = () => {
         return;
       }
 
-      if (pathname === '/' || pathname === '' || pathname === '/landing' || pageParam === 'landing' || (!currentUser && !isAuthRoute && !isDashboardRoute)) {
+      if (isAdminRoute) {
+        setShowLandingPage(false);
+        if (currentUser?.role === 'SUPER_ADMIN') {
+          document.title = 'Ardhnarishwar AI Robotics — Super Admin Master Console';
+        } else {
+          document.title = 'Ardhnarishwar AI Robotics — Super Admin Secure Login';
+        }
+        return;
+      }
+
+      if (pathname === '/' || pathname === '' || pathname === '/landing' || pageParam === 'landing' || (!currentUser && !isAuthRoute && !isDashboardRoute && !isAdminRoute)) {
         setShowLandingPage(true);
         document.title = 'Ardhnarishwar AI Robotics — Autonomous SaaS Recruitment Platform';
         return;
@@ -127,8 +139,10 @@ const AppContent: React.FC = () => {
 
   const renderPortalContent = () => {
     const pathname = currentPath.toLowerCase();
+    const params = new URLSearchParams(window.location.search);
     const isAuthRoute = pathname.includes('/auth') || pathname.includes('/login') || pathname.includes('/register');
     const isDashboardRoute = pathname.includes('/dashboard');
+    const isAdminRoute = pathname.startsWith('/admin') || pathname.startsWith('/superadmin') || params.get('portal') === 'superadmin' || params.get('portal') === 'super_admin';
 
     // 1. Direct Token Candidate AI Chamber Link (?token=...) or Chamber launch button clicked
     if (candidateTokenForChamber) {
@@ -141,7 +155,7 @@ const AppContent: React.FC = () => {
     }
 
     // 2. Landing Page View (Website Frontend Presentation - DEFAULT ON ROOT)
-    if (showLandingPage || pathname === '/' || pathname === '' || pathname === '/landing' || (!currentUser && !isAuthRoute && !isDashboardRoute)) {
+    if (showLandingPage || pathname === '/' || pathname === '' || pathname === '/landing' || (!currentUser && !isAuthRoute && !isDashboardRoute && !isAdminRoute)) {
       return (
         <LandingPage
           onNavigateAuth={(tab) => {
@@ -154,6 +168,10 @@ const AppContent: React.FC = () => {
             } else {
               navigate('/org/auth/login');
             }
+          }}
+          onNavigateSuperAdmin={() => {
+            setShowLandingPage(false);
+            navigate('/admin/dashboard?portal=superadmin');
           }}
           onLaunchCandidateChamber={() => {
             setShowLandingPage(false);
@@ -173,13 +191,20 @@ const AppContent: React.FC = () => {
       return (
         <GlobalAuthPortal
           portalMode={isCandidateRoute ? 'candidate' : 'enterprise'}
-          initialTab={isCandidateRoute ? 'candidate' : (authInitialTab || 'admin')}
+          initialTab={isAdminRoute ? 'admin' : (isCandidateRoute ? 'candidate' : (authInitialTab || 'admin'))}
           onCandidateLaunchChamber={(token) => {
             setCandidateTokenForChamber(token);
             navigate('/candidate/dashboard');
           }}
-          onAdminLoginSuccess={() => {
-            navigate('/org/dashboard');
+          onAdminLoginSuccess={(dest?: string) => {
+            const activeUser = AppDataStore.getUsers().find(u => u.id === localStorage.getItem('ardhnarishwar_active_user_id'));
+            if (dest) {
+              navigate(dest);
+            } else if (activeUser?.role === 'SUPER_ADMIN') {
+              navigate('/admin/dashboard');
+            } else {
+              navigate('/org/dashboard');
+            }
           }}
         />
       );

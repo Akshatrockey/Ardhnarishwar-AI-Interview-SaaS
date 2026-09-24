@@ -28,8 +28,9 @@ interface ShareLinksModalProps {
 
 export const ShareLinksModal: React.FC<ShareLinksModalProps> = ({ isOpen, onClose }) => {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
-  const [customToken, setCustomToken] = useState<string>('TOKEN_PRIYA_ROBOTICS_2026');
-  const [customRoom, setCustomRoom] = useState<string>('ROOM-ARDH-ROBOTICS-882');
+  const defaultCand = AppDataStore.getCandidates()[0];
+  const [customToken, setCustomToken] = useState<string>(defaultCand?.interviewToken || 'TOKEN_CANDIDATE_ACTIVE');
+  const [customRoom, setCustomRoom] = useState<string>(defaultCand ? `ROOM-LIVE-${defaultCand.companyId || 'ORG'}-${defaultCand.id}` : 'ROOM-LIVE-SESSION');
   const [showQrKey, setShowQrKey] = useState<string | null>(null);
 
   if (!isOpen) return null;
@@ -239,7 +240,7 @@ export const ShareLinksModal: React.FC<ShareLinksModalProps> = ({ isOpen, onClos
                           type="text"
                           value={customToken}
                           onChange={(e) => setCustomToken(e.target.value)}
-                          placeholder="TOKEN_PRIYA_ROBOTICS_2026"
+                          placeholder="TOKEN_CANDIDATE_ACTIVE"
                           className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-emerald-300 font-mono outline-none focus:border-emerald-500"
                         />
                       </div>

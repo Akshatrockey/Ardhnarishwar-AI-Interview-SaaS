@@ -95,7 +95,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </span>
           </div>
           <div className="text-xs font-extrabold text-white truncate">
-            {isSuperAdmin ? 'Ardhnarishwar Global HQ' : (currentCompany?.name || 'Cyberdyne Systems')}
+            {isSuperAdmin ? 'Ardhnarishwar Global HQ' : (currentCompany?.name || 'Ardhnarishwar AI')}
           </div>
           <div className="text-[10px] text-slate-400 flex items-center gap-1.5 font-mono">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />

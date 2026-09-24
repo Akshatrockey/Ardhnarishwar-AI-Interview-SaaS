@@ -419,6 +419,18 @@ export const LiveAIInterviewChamber: React.FC<LiveAIInterviewChamberProps> = ({
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
+  if (!questions || questions.length === 0) {
+    return (
+      <div className="p-8 rounded-3xl bg-slate-900 border border-slate-800 text-center max-w-lg mx-auto space-y-4 my-12">
+        <AlertTriangle className="w-12 h-12 text-amber-400 mx-auto" />
+        <h2 className="text-xl font-bold text-white">No Active Questions Configured</h2>
+        <p className="text-sm text-slate-400">
+          No questions are bound to this role ({job.title}). All mock and default questions have been removed (Count = 0).
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full max-w-7xl mx-auto space-y-4 p-2 sm:p-4 animate-in fade-in">
       

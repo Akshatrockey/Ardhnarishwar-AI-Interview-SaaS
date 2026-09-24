@@ -237,9 +237,10 @@ async def get_meet_credentials_endpoint(
         current_user.role in ("SUPER_ADMIN", "COMPANY_ADMIN", "RECRUITER", "EMPLOYEE") and
         (current_user.role == "SUPER_ADMIN" or current_user.company_id == cand.company_id)
     )
+    candidate_token_match = getattr(current_user, 'interview_token', None) == cand.interview_token
     is_candidate = (
         current_user.role == "CANDIDATE" and
-        (current_user.id == cand.id or current_user.email.lower() == cand.email.lower())
+        (current_user.id == cand.id or current_user.email.lower() == cand.email.lower() or current_user.id == cand.interview_token or candidate_token_match)
     )
 
     if not is_hr and not is_candidate:
@@ -247,6 +248,8 @@ async def get_meet_credentials_endpoint(
             status_code=403,
             detail="Unauthorized entry: Live interview is private between company HR and selected candidate."
         )
+
+    deterministic_room_id = f"ROOM-LIVE-{cand.company_id or 'ORG'}-{cand.id}"
 
     if is_hr:
         # Return Host credentials with Host role
@@ -260,10 +263,12 @@ async def get_meet_credentials_endpoint(
             "candidate_email": cand.email,
             "job_title": job_title,
             "meeting_id": meeting.zoom_meeting_id,
+            "room_id": deterministic_room_id,
             "passcode": meeting.zoom_passcode,
             "start_url": meeting.start_url,
             "join_url": meeting.join_url,
             "web_client_url": f"https://app.zoom.us/wc/{meeting.zoom_meeting_id}/start?pwd={meeting.zoom_passcode}",
+            "sdk_key": zoom_service.sdk_key or "ardhnarishwar_zoom_sdk_key",
             "sdk_signature": zoom_service.generate_sdk_signature(meeting.zoom_meeting_id, role=1),
             "status": meeting.status
         }
@@ -279,10 +284,44 @@ async def get_meet_credentials_endpoint(
             "candidate_email": cand.email,
             "job_title": job_title,
             "meeting_id": meeting.zoom_meeting_id,
+            "room_id": deterministic_room_id,
             "passcode": meeting.zoom_passcode,
             "start_url": None, # Never expose Host Start URL to candidates
             "join_url": meeting.join_url,
             "web_client_url": f"https://app.zoom.us/wc/{meeting.zoom_meeting_id}/join?pwd={meeting.zoom_passcode}",
+            "sdk_key": zoom_service.sdk_key or "ardhnarishwar_zoom_sdk_key",
             "sdk_signature": zoom_service.generate_sdk_signature(meeting.zoom_meeting_id, role=0),
             "status": meeting.status
         }
+
+
+class ZoomSignatureRequest(BaseModel):
+    meetingNumber: str
+    role: int = 0  # 1 for Host, 0 for Attendee
+
+@router.post("/api/v1/interviews/zoom-signature")
+@router.post("/api/interviews/zoom-signature")
+async def generate_zoom_signature_endpoint(
+    req: ZoomSignatureRequest,
+    current_user: AuthenticatedIdentity = Depends(get_current_user)
+):
+    """
+    Secure Zoom SDK JWT Signature Generator:
+    Generates HMAC-SHA256 signature for Zoom Web SDK component or client view.
+    Role: 1 for Host/Interviewer, 0 for Attendee/Candidate.
+    """
+    clean_mn = str(req.meetingNumber).replace(" ", "").replace("-", "").strip()
+    
+    # Enforce role integrity: Only authenticated HR/Admin can request Host signature (role=1)
+    assigned_role = req.role
+    if assigned_role == 1 and current_user.role not in ("SUPER_ADMIN", "COMPANY_ADMIN", "RECRUITER", "EMPLOYEE"):
+        assigned_role = 0 # Downgrade to attendee
+
+    sig = zoom_service.generate_sdk_signature(clean_mn, role=assigned_role)
+    return {
+        "success": True,
+        "signature": sig,
+        "sdkKey": zoom_service.sdk_key or "ardhnarishwar_zoom_sdk_key",
+        "meetingNumber": clean_mn,
+        "role": assigned_role
+    }

@@ -233,7 +233,7 @@ export const JobManager: React.FC<JobManagerProps> = ({ onLaunchLiveInterview })
     }
 
     const assignedJob = jobs.find(j => j.id === assignedJobId) || targetJobForInvite || jobs[0];
-    const companyId = currentCompany?.id || assignedJob?.companyId || 'comp_cyberdyne';
+    const companyId = currentCompany?.id || assignedJob?.companyId || 'comp_ardhnarishwar';
 
     setInviteSubmitting(true);
     const cleanFirstName = inviteFirstName.trim();
@@ -368,7 +368,7 @@ export const JobManager: React.FC<JobManagerProps> = ({ onLaunchLiveInterview })
     if (!targetRound) {
       targetRound = {
         id: `rnd_${Date.now()}`,
-        companyId: currentCompany?.id || 'comp_cyberdyne',
+        companyId: currentCompany?.id || 'comp_ardhnarishwar',
         jobId: selectedJobForQuestions.id,
         name: `${selectedJobForQuestions.title} Assessment`,
         roundNumber: 1,

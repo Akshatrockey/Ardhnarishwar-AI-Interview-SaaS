@@ -65,9 +65,9 @@ interface LiveVideoConferenceRoomProps {
 }
 
 export const LiveVideoConferenceRoom: React.FC<LiveVideoConferenceRoomProps> = ({
-  initialRoomId = 'ROOM-ARDH-ROBOTICS-882',
-  candidateName = 'Priya Sharma',
-  jobTitle = 'Lead Robotics Controls & Kinematics Engineer',
+  initialRoomId = 'ROOM-LIVE-EXECUTIVE-PANEL',
+  candidateName = 'Candidate Interviewee',
+  jobTitle = 'Interview Assessment Track',
   onLeaveRoom,
 }) => {
   const { currentUser } = useAuth();
@@ -101,10 +101,10 @@ export const LiveVideoConferenceRoom: React.FC<LiveVideoConferenceRoomProps> = (
   const [activeSpeakerId, setActiveSpeakerId] = useState<string>('part_local');
 
   // Real-Time Scoring Rubric State
-  const [technicalScore, setTechnicalScore] = useState<number>(88);
-  const [communicationScore, setCommunicationScore] = useState<number>(92);
-  const [problemSolvingScore, setProblemSolvingScore] = useState<number>(85);
-  const [interviewerNotes, setInterviewerNotes] = useState<string>('Strong grasp of DH parameters, Jacobian rank deficiency, and real-time ROS2 executor threads.');
+  const [technicalScore, setTechnicalScore] = useState<number>(85);
+  const [communicationScore, setCommunicationScore] = useState<number>(88);
+  const [problemSolvingScore, setProblemSolvingScore] = useState<number>(82);
+  const [interviewerNotes, setInterviewerNotes] = useState<string>('Candidate demonstrated structured domain fundamentals and clear situational logic.');
   const [scoreSubmitted, setScoreSubmitted] = useState<boolean>(false);
 
   // Real-time WebSocket, Consensus & Panel Chat State
@@ -128,51 +128,32 @@ export const LiveVideoConferenceRoom: React.FC<LiveVideoConferenceRoomProps> = (
   const [isCopilotThinking, setIsCopilotThinking] = useState<boolean>(false);
   const [copilotEngine, setCopilotEngine] = useState<string>('claude-3-5-sonnet');
 
-  // Participants List
+  const isCandidateUser = currentUser?.role === 'CANDIDATE';
+  const orgName = currentUser?.role === 'SUPER_ADMIN' ? 'Ardhnarishwar Global HQ' : (currentCompany?.name || 'Organization Workspace');
+
+  // Dynamic Participants List based on real session
   const [participants, setParticipants] = useState<MeetingParticipant[]>([
     {
       id: 'part_local',
-      name: `${currentUser?.name || 'You'} (${currentUser?.role === 'SUPER_ADMIN' ? 'Super Admin HQ' : 'Host / Panel Lead'})`,
-      role: (currentUser?.role as any) || 'SUPER_ADMIN',
-      organization: currentUser?.role === 'SUPER_ADMIN' ? 'Ardhnarishwar HQ Global' : (currentCompany?.name || 'Cyberdyne Systems'),
+      name: `${currentUser?.name || (isCandidateUser ? candidateName : 'You')} (${isCandidateUser ? 'Candidate (Attendee)' : (currentUser?.role === 'SUPER_ADMIN' ? 'Super Admin HQ' : 'Host / Interviewer')})`,
+      role: (currentUser?.role as any) || (isCandidateUser ? 'CANDIDATE' : 'COMPANY_ADMIN'),
+      organization: isCandidateUser ? 'Applicant Candidate' : orgName,
       avatar: currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
       isMuted: false,
       isVideoOn: true,
       isSpeaking: true,
-      pingMs: 12,
+      pingMs: 14,
     },
     {
-      id: 'part_candidate',
-      name: candidateName,
-      role: 'CANDIDATE',
-      organization: 'Applicant Candidate',
-      avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=120&auto=format&fit=crop&q=80',
+      id: isCandidateUser ? 'part_host' : 'part_candidate',
+      name: isCandidateUser ? `${currentCompany?.name || 'Organization'} Technical Lead` : candidateName,
+      role: isCandidateUser ? 'COMPANY_ADMIN' : 'CANDIDATE',
+      organization: isCandidateUser ? orgName : 'Applicant Candidate',
+      avatar: isCandidateUser ? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80' : 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=120&auto=format&fit=crop&q=80',
       isMuted: false,
       isVideoOn: true,
       isSpeaking: false,
-      pingMs: 24,
-    },
-    {
-      id: 'part_company_admin',
-      name: 'Dr. Miles Bennett (VP Eng)',
-      role: 'COMPANY_ADMIN',
-      organization: 'Cyberdyne Systems',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80',
-      isMuted: false,
-      isVideoOn: true,
-      isSpeaking: false,
-      pingMs: 18,
-    },
-    {
-      id: 'part_recruiter',
-      name: 'Sarah Connor (Talent Lead)',
-      role: 'RECRUITER',
-      organization: 'Cyberdyne Systems',
-      avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=120&auto=format&fit=crop&q=80',
-      isMuted: true,
-      isVideoOn: true,
-      isSpeaking: false,
-      pingMs: 30,
+      pingMs: 22,
     },
     {
       id: 'part_ai_bot',
@@ -1112,7 +1093,7 @@ export const LiveVideoConferenceRoom: React.FC<LiveVideoConferenceRoomProps> = (
                 >
                   <div className="text-xs font-bold text-cyan-300">1. Real-Time Threading Safety</div>
                   <p className="text-[11px] text-slate-300 leading-relaxed">
-                    "Ask Priya how lock-free ring buffers prevent thread contention between 1kHz motor timers and ROS2 DDS callbacks."
+                    "Ask the candidate how lock-free ring buffers prevent thread contention between 1kHz motor timers and ROS2 DDS callbacks."
                   </p>
                 </div>
 

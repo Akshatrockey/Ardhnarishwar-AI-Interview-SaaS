@@ -39,40 +39,40 @@ export const CompanySettings: React.FC = () => {
   const [logoUrl, setLogoUrl] = useState(currentCompany?.logoUrl || currentCompany?.logo || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=120&auto=format&fit=crop&q=80');
   const [faviconUrl, setFaviconUrl] = useState(currentCompany?.faviconUrl || '');
   const [brandAccentColor, setBrandAccentColor] = useState(currentCompany?.brandAccentColor || '#06B6D4');
-  const [website, setWebsite] = useState(currentCompany?.website || (currentCompany?.domain ? `https://${currentCompany.domain}` : 'https://cyberdyne.ai'));
+  const [website, setWebsite] = useState(currentCompany?.website || (currentCompany?.domain ? `https://${currentCompany.domain}` : 'https://ardhnarishwar.ai'));
 
   // Form States - Business & Legal
-  const [taxId, setTaxId] = useState(currentCompany?.taxId || 'US-EIN-98-7654321');
-  const [industry, setIndustry] = useState(currentCompany?.industry || 'Robotics & Autonomous Systems');
+  const [taxId, setTaxId] = useState(currentCompany?.taxId || 'IN-GST-29AAAAA0000A1Z5');
+  const [industry, setIndustry] = useState(currentCompany?.industry || 'Enterprise AI & Autonomous Software');
   const [companySize, setCompanySize] = useState(currentCompany?.companySize || '51-200 employees');
-  const [description, setDescription] = useState(currentCompany?.description || currentCompany?.bio || 'Global leader in real-time robotic kinematics, autonomous control algorithms, and edge-AI perception systems.');
+  const [description, setDescription] = useState(currentCompany?.description || currentCompany?.bio || 'Autonomous AI recruitment, proctored evaluations, and live interview orchestration platform.');
 
   // Form States - Contact & HQ
-  const [hqStreet, setHqStreet] = useState(currentCompany?.hqStreet || '100 Innovation Way, Cyberdyne Tower');
-  const [hqCity, setHqCity] = useState(currentCompany?.hqCity || 'San Francisco');
-  const [hqState, setHqState] = useState(currentCompany?.hqState || 'California');
-  const [hqCountry, setHqCountry] = useState(currentCompany?.hqCountry || 'United States');
-  const [hqPostalCode, setHqPostalCode] = useState(currentCompany?.hqPostalCode || '94105');
-  const [contactPerson, setContactPerson] = useState(currentCompany?.contactPerson || 'Dr. Miles Bennett');
-  const [contactEmail, setContactEmail] = useState(currentCompany?.contactEmail || 'talent@cyberdyne.ai');
-  const [phone, setPhone] = useState(currentCompany?.phone || '+1 (415) 890-5432');
-  const [supportEmail, setSupportEmail] = useState(currentCompany?.supportEmail || 'support@cyberdyne.ai');
+  const [hqStreet, setHqStreet] = useState(currentCompany?.hqStreet || 'Ardhnarishwar Innovation Hub');
+  const [hqCity, setHqCity] = useState(currentCompany?.hqCity || 'Bengaluru');
+  const [hqState, setHqState] = useState(currentCompany?.hqState || 'Karnataka');
+  const [hqCountry, setHqCountry] = useState(currentCompany?.hqCountry || 'India');
+  const [hqPostalCode, setHqPostalCode] = useState(currentCompany?.hqPostalCode || '560100');
+  const [contactPerson, setContactPerson] = useState(currentCompany?.contactPerson || 'Lead Talent Partner');
+  const [contactEmail, setContactEmail] = useState(currentCompany?.contactEmail || 'talent@ardhnarishwar.ai');
+  const [phone, setPhone] = useState(currentCompany?.phone || '+91 80 4000 5000');
+  const [supportEmail, setSupportEmail] = useState(currentCompany?.supportEmail || 'support@ardhnarishwar.ai');
 
   // Form States - Localization & Operations
-  const [timezone, setTimezone] = useState(currentCompany?.timezone || 'America/Los_Angeles');
-  const [currency, setCurrency] = useState(currentCompany?.currency || 'USD');
+  const [timezone, setTimezone] = useState(currentCompany?.timezone || 'Asia/Kolkata');
+  const [currency, setCurrency] = useState(currentCompany?.currency || 'INR');
   const [dateFormat, setDateFormat] = useState(currentCompany?.dateFormat || 'YYYY-MM-DD');
   const [workWeek, setWorkWeek] = useState(currentCompany?.workWeek || 'Monday - Friday');
 
   // Form States - Social & Public Links
-  const [linkedin, setLinkedin] = useState(currentCompany?.socialLinks?.linkedin || 'https://linkedin.com/company/cyberdyne-systems');
-  const [twitter, setTwitter] = useState(currentCompany?.socialLinks?.twitter || 'https://x.com/cyberdyne');
-  const [github, setGithub] = useState(currentCompany?.socialLinks?.github || 'https://github.com/cyberdyne-robotics');
-  const [portfolio, setPortfolio] = useState(currentCompany?.socialLinks?.portfolio || 'https://cyberdyne.ai/research');
+  const [linkedin, setLinkedin] = useState(currentCompany?.socialLinks?.linkedin || 'https://linkedin.com/company/ardhnarishwar-ai');
+  const [twitter, setTwitter] = useState(currentCompany?.socialLinks?.twitter || 'https://x.com/ardhnarishwar');
+  const [github, setGithub] = useState(currentCompany?.socialLinks?.github || 'https://github.com/Akshatrockey');
+  const [portfolio, setPortfolio] = useState(currentCompany?.socialLinks?.portfolio || 'https://ardhnarishwar.ai');
 
   // Form States - Governance & Security
   const [dataRetentionDays, setDataRetentionDays] = useState(currentCompany?.dataRetentionDays || 365);
-  const [securityContactEmail, setSecurityContactEmail] = useState(currentCompany?.securityContactEmail || 'security@cyberdyne.ai');
+  const [securityContactEmail, setSecurityContactEmail] = useState(currentCompany?.securityContactEmail || 'security@ardhnarishwar.ai');
   const [aiCustomRules, setAiCustomRules] = useState(currentCompany?.aiCustomRulesEnabled ?? true);
 
   // Status & Feedback States

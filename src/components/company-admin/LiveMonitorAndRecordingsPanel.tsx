@@ -68,16 +68,18 @@ export const LiveMonitorAndRecordingsPanel: React.FC<LiveMonitorAndRecordingsPan
   // Intercom input state
   const [intercomMsg, setIntercomMsg] = useState<string>('');
   const [intercomQuestion, setIntercomQuestion] = useState<string>('Can you elaborate on your singularity avoidance strategy in joint space?');
-  const [intercomTargetSessionId, setIntercomTargetSessionId] = useState<string>('sess_priya_01');
+  const [intercomTargetSessionId, setIntercomTargetSessionId] = useState<string>(sessions[0]?.id || '');
   const [intercomSentSuccess, setIntercomSentSuccess] = useState<boolean>(false);
 
   const getCandidateForSession = (candidateId: string) => {
-    return candidates.find(c => c.id === candidateId) || candidates[0];
+    return candidates.find(c => c.id === candidateId) || candidates[0] || null;
   };
 
   const filteredSessions = sessions.filter(s => {
     const cand = getCandidateForSession(s.candidateId);
-    const fullText = `${cand.firstName} ${cand.lastName} ${cand.id} ${s.id}`.toLowerCase();
+    const fullText = cand 
+      ? `${cand.firstName || ''} ${cand.lastName || ''} ${cand.id || ''} ${s.id}`.toLowerCase()
+      : s.id.toLowerCase();
     return fullText.includes(searchQuery.toLowerCase());
   });
 
@@ -166,7 +168,7 @@ export const LiveMonitorAndRecordingsPanel: React.FC<LiveMonitorAndRecordingsPan
       senderId: currentUser?.id || 'usr_recruiter',
       senderName: currentUser?.name || 'Recruiter Lead',
       senderRole: currentUser?.role || 'RECRUITER',
-      targetCandidateId: 'cand_priya_01',
+      targetCandidateId: sessions.find(s => s.id === intercomTargetSessionId)?.candidateId || candidates[0]?.id || '',
       message: intercomMsg || 'Live Recruiter Guidance',
       promptQuestion: intercomQuestion,
       timestamp: new Date().toISOString()

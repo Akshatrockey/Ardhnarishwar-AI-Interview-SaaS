@@ -473,7 +473,7 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
                 {currentEmployee ? `${currentEmployee.firstName} ${currentEmployee.lastName}` : 'Senior Staff'}
               </div>
               <div className="text-[10px] text-slate-400 font-mono">
-                {currentCompany?.name || 'Cyberdyne Systems'}
+                {currentCompany?.name || 'Ardhnarishwar AI'}
               </div>
             </div>
 

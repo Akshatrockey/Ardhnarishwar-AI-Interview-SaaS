@@ -72,7 +72,14 @@ export const CompanyAdminPortal: React.FC<CompanyAdminPortalProps> = ({
   const { language, setLanguage } = useLanguage();
   const { latencyMs } = useRealtime();
 
-  const [activeTab, setActiveTab] = useState<string>('dashboard');
+  const [activeTab, setActiveTabState] = useState<string>(() => {
+    return sessionStorage.getItem('ardh_org_active_tab') || 'dashboard';
+  });
+
+  const setActiveTab = (tab: string) => {
+    sessionStorage.setItem('ardh_org_active_tab', tab);
+    setActiveTabState(tab);
+  };
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
   const [schedulingCandidate, setSchedulingCandidate] = useState<Candidate | null>(null);
   const [conferenceRoom, setConferenceRoom] = useState<{ roomId: string; name: string; title: string } | null>(null);
@@ -167,23 +174,135 @@ export const CompanyAdminPortal: React.FC<CompanyAdminPortalProps> = ({
           />
         );
       case 'live_zoom_meet':
+        if (liveZoomMeeting) {
+          return (
+            <LiveZoomMeetingView
+              applicationId={liveZoomMeeting.applicationId}
+              candidateName={liveZoomMeeting.candidateName}
+              jobTitle={liveZoomMeeting.jobTitle}
+              onLeaveMeeting={() => {
+                setLiveZoomMeeting(null);
+              }}
+            />
+          );
+        }
+
+        const eligibleCandidates = candidates.filter(c => c.status === 'SHORTLISTED' || c.status === 'EVALUATED' || c.status === 'HIRED');
+
         return (
-          <LiveZoomMeetingView
-            applicationId={liveZoomMeeting?.applicationId || selectedCandidateId || 'app_meet_active'}
-            candidateName={liveZoomMeeting?.candidateName || 'Candidate Interviewee'}
-            jobTitle={liveZoomMeeting?.jobTitle || 'Executive Assessment'}
-            onLeaveMeeting={() => {
-              setLiveZoomMeeting(null);
-              setActiveTab('dashboard');
-            }}
-          />
+          <div className="space-y-6 max-w-6xl mx-auto animate-in fade-in">
+            {/* Header Banner */}
+            <div className="p-6 rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border border-slate-800 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div>
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-bold mb-2">
+                  <Video className="w-3.5 h-3.5" />
+                  <span>Executive 1-on-1 Interview Control Panel</span>
+                </div>
+                <h1 className="text-xl sm:text-2xl font-extrabold text-white">
+                  Live Meeting Synchronization & Candidate Roster
+                </h1>
+                <p className="text-xs text-slate-400 mt-1 max-w-xl">
+                  Connect authenticated organization interviewers directly with shortlisted candidates. Starting a call alerts the candidate in real-time and binds both parties to the synchronized room.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-mono text-slate-400 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800">
+                  {eligibleCandidates.length} Candidates Eligible
+                </span>
+              </div>
+            </div>
+
+            {/* Candidate Roster Grid */}
+            <div className="space-y-3">
+              <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                <Radio className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
+                <span>Active Candidates Ready for Live Executive Call</span>
+              </h2>
+
+              {eligibleCandidates.length === 0 ? (
+                <div className="p-8 rounded-3xl bg-slate-900/60 border border-slate-800 text-center space-y-3">
+                  <Users className="w-10 h-10 text-slate-600 mx-auto" />
+                  <h3 className="text-sm font-bold text-slate-300">No Candidates Currently Shortlisted</h3>
+                  <p className="text-xs text-slate-500 max-w-md mx-auto">
+                    Shortlist candidates from your Candidate Pipeline or Results & Scorecards to enable one-click live video interviews.
+                  </p>
+                  <button
+                    onClick={() => setActiveTab('candidates')}
+                    className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs transition"
+                  >
+                    View Candidate Pipeline
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {eligibleCandidates.map((cand) => {
+                    const candJob = jobs.find(j => j.id === cand.jobId);
+                    const isShortlisted = cand.status === 'SHORTLISTED';
+                    return (
+                      <div
+                        key={cand.id}
+                        className="p-5 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition shadow-lg space-y-4"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-cyan-600 to-indigo-600 flex items-center justify-center text-white font-extrabold text-base shadow-md">
+                              {cand.firstName[0]}{cand.lastName[0]}
+                            </div>
+                            <div>
+                              <h3 className="text-sm font-bold text-white">
+                                {cand.firstName} {cand.lastName}
+                              </h3>
+                              <p className="text-xs text-slate-400">
+                                {candJob?.title || cand.currentTitle || 'Interview Candidate'}
+                              </p>
+                              <div className="flex items-center gap-2 mt-1 text-[11px] font-mono text-slate-500">
+                                <span>{cand.email}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border flex items-center gap-1 ${
+                            isShortlisted
+                              ? 'bg-emerald-950 text-emerald-300 border-emerald-800'
+                              : 'bg-cyan-950 text-cyan-300 border-cyan-800'
+                          }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${isShortlisted ? 'bg-emerald-400 animate-pulse' : 'bg-cyan-400'}`} />
+                            {isShortlisted ? 'Ready in Lobby' : cand.status}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-2 border-t border-slate-800/80">
+                          <button
+                            onClick={() => setSelectedCandidateId(cand.id)}
+                            className="text-xs text-cyan-400 hover:text-cyan-300 font-bold transition flex items-center gap-1"
+                          >
+                            <Award className="w-3.5 h-3.5" />
+                            <span>View Scorecard</span>
+                          </button>
+
+                          <button
+                            onClick={() => handleLaunchConferenceForCandidate(cand)}
+                            className="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-purple-600/30 transition flex items-center gap-1.5 active:scale-95"
+                          >
+                            <Video className="w-3.5 h-3.5" />
+                            <span>Start Live Call</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
         );
       case 'live_conference':
         return (
           <LiveVideoConferenceRoom
-            candidateName={conferenceRoom?.name || 'Priya Sharma'}
-            jobTitle={conferenceRoom?.title || 'Lead Robotics Perception Engineer'}
-            initialRoomId={conferenceRoom?.roomId || 'ROOM-ARDH-ROBOTICS-882'}
+            candidateName={conferenceRoom?.name || 'Candidate Interviewee'}
+            jobTitle={conferenceRoom?.title || 'Executive Assessment Track'}
+            initialRoomId={conferenceRoom?.roomId || 'ROOM-LIVE-EXECUTIVE-PANEL'}
             onLeaveRoom={() => setActiveTab('dashboard')}
           />
         );
@@ -245,7 +364,7 @@ export const CompanyAdminPortal: React.FC<CompanyAdminPortalProps> = ({
               className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 border border-indigo-900/60 hover:border-indigo-500 text-xs font-bold text-slate-200 transition-colors"
             >
               <Building2 className="w-3.5 h-3.5 text-indigo-400" />
-              <span>{currentCompany?.name || 'Cyberdyne Systems'}</span>
+              <span>{currentCompany?.name || 'Ardhnarishwar AI'}</span>
               <ChevronDown className="w-3 h-3 text-slate-400" />
             </button>
 
@@ -377,7 +496,7 @@ export const CompanyAdminPortal: React.FC<CompanyAdminPortalProps> = ({
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               </div>
               <div className="text-xs font-black text-white truncate">
-                {currentCompany?.name || 'Cyberdyne Systems'}
+                {currentCompany?.name || 'Ardhnarishwar AI'}
               </div>
               <div className="text-[10px] text-slate-400 font-mono">
                 {jobs.length} Active Openings • {candidates.length} Applicants

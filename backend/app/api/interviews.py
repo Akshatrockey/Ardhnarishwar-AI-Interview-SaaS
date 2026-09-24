@@ -61,58 +61,48 @@ async def initiate_interview_session_endpoint(req: SessionInitiateRequest, db: S
         (Candidate.interview_token == token_str) | (Candidate.id == token_str)
     ).first()
 
-    if not cand:
+    # Strict pre-interview authorization check:
+    # Verify an active, approved application exists for the candidate and job.
+    # If absent or invalid (e.g. candidate not found, no job attached, or REJECTED status),
+    # immediately block chamber entry with explanatory message.
+    if not cand or not cand.job or cand.status == 'REJECTED':
         raise HTTPException(
-            status_code=404,
-            detail="Invalid interview invitation token. Please check your invitation link."
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No active application found for this role."
         )
 
     job = cand.job
-    if not job:
-        # Find or create active job
-        first_job = db.query(Job).filter(Job.company_id == cand.company_id).first()
-        if not first_job:
-            first_job = db.query(Job).first()
-        if not first_job:
-            first_job = Job(
-                id=f"job_{uuid.uuid4().hex[:10]}",
-                company_id=cand.company_id or "comp_ardhnarishwar",
-                title="AI Assessment & Professional Track",
-                department="Technology",
-                location="Remote / Hybrid",
-                job_type="FULL_TIME",
-                experience_level="MID",
-                skill_category="SKILLED",
-                required_skills=["Core Domain", "Problem Solving", "Communication"],
-                description="Professional AI interview assessment position.",
-                status="OPEN",
-                created_at=datetime.now(timezone.utc)
-            )
-            db.add(first_job)
-            db.flush()
-        cand.job_id = first_job.id
-        db.commit()
-        db.refresh(cand)
-        job = first_job
 
-    # Select primary interview round
+    # Select primary interview round strictly mapped to this job
     round_obj = job.rounds[0] if job.rounds else None
     if not round_obj:
-        # Create standard round if none exists
-        round_obj = InterviewRound(
-            id=f"round_{uuid.uuid4().hex[:10]}",
-            company_id=cand.company_id,
-            job_id=job.id,
-            name=f"{job.title} AI Technical Assessment",
-            round_number=1,
-            round_type="TECHNICAL_ROBOTICS",
-            time_limit_minutes=25,
-            passing_score=70.0,
-            proctoring_strictness="MILITARY_GRADE",
-            created_at=datetime.now(timezone.utc)
+        # Check if any round exists for this specific job
+        round_obj = db.query(InterviewRound).filter(InterviewRound.job_id == job.id).order_by(InterviewRound.round_number).first()
+
+    if not round_obj:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No interview assessment round configured for this role. Please contact the hiring team."
         )
-        db.add(round_obj)
-        db.flush()
+
+    # Gather assigned questions strictly mapped to this specific job round (Zero fallback/mock questions)
+    assigned_questions = []
+    for q in (round_obj.questions or []):
+        assigned_questions.append({
+            "id": q.id,
+            "title": q.title,
+            "prompt": q.prompt,
+            "category": q.category,
+            "difficulty": q.difficulty,
+            "expected_duration_sec": q.expected_duration_sec
+        })
+
+    # Strict zero default question policy: questions must strictly map to job_id / round_id
+    if not assigned_questions:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No assessment questions configured for this role. Default questions count = 0. Please contact the recruiting team."
+        )
 
     # Look for existing in-progress session or create new
     session = db.query(InterviewSession).filter(
@@ -137,100 +127,9 @@ async def initiate_interview_session_endpoint(req: SessionInitiateRequest, db: S
         db.commit()
         db.refresh(session)
 
-    # Gather assigned questions
-    assigned_questions = []
-    for q in (round_obj.questions or []):
-        assigned_questions.append({
-            "id": q.id,
-            "title": q.title,
-            "prompt": q.prompt,
-            "category": q.category,
-            "difficulty": q.difficulty,
-            "expected_duration_sec": q.expected_duration_sec
-        })
-
-    # If round had no questions, query company/global questions as fallback
-    if not assigned_questions:
-        fallback_qs = db.query(QuestionBank).filter(
-            (QuestionBank.company_id == cand.company_id) | (QuestionBank.is_global == True)
-        ).limit(3).all()
-        for q in fallback_qs:
-            assigned_questions.append({
-                "id": q.id,
-                "title": q.title,
-                "prompt": q.prompt,
-                "category": q.category,
-                "difficulty": q.difficulty,
-                "expected_duration_sec": q.expected_duration_sec
-            })
-
-    # Dynamic auto-generation fallback if question bank is completely empty
-    if not assigned_questions:
-        is_skilled = (getattr(job, "skill_category", "SKILLED") or "SKILLED").upper() == "SKILLED"
-        templates = [
-            {
-                "title": f"Technical Background for {job.title}" if is_skilled else f"Work Experience for {job.title}",
-                "prompt": f"Please introduce yourself and describe your technical experience relevant to the {job.title} role. What core technologies, tools, or frameworks do you specialize in?" if is_skilled else f"Please tell us about your past work experience related to {job.title}. What tasks or machinery are you most experienced with?",
-                "category": "TECHNICAL" if is_skilled else "WORKFORCE_PRACTICAL",
-                "difficulty": "MEDIUM" if is_skilled else "EASY",
-                "expected_duration_sec": 120 if is_skilled else 90,
-                "benchmark": "Demonstrates clear background, relevant hands-on experience, methodology knowledge, and structured communication."
-            },
-            {
-                "title": "Problem Solving & Architecture" if is_skilled else "Safety & Standard Procedures",
-                "prompt": "Describe a difficult technical bug, system bottleneck, or architectural challenge you encountered in a recent project. What steps did you take to debug and resolve it?" if is_skilled else "How do you ensure workplace safety, follow standard operating instructions, and handle busy shifts or unexpected situations?",
-                "category": "PROBLEM_SOLVING" if is_skilled else "SAFETY_COMPLIANCE",
-                "difficulty": "HARD" if is_skilled else "MEDIUM",
-                "expected_duration_sec": 150 if is_skilled else 90,
-                "benchmark": "Identifies root cause systematically, applies safety procedures, and ensures operational continuity."
-            },
-            {
-                "title": "Engineering Standards & Collaboration" if is_skilled else "Punctuality & Teamwork",
-                "prompt": "How do you ensure code quality, test coverage, and smooth team collaboration when deploying features into production environments?" if is_skilled else "How do you work with teammates on site, and how do you ensure consistent attendance and on-time task delivery?",
-                "category": "BEHAVIORAL" if is_skilled else "RELIABILITY",
-                "difficulty": "MEDIUM" if is_skilled else "EASY",
-                "expected_duration_sec": 120 if is_skilled else 90,
-                "benchmark": "Shows strong teamwork, high accountability, adherence to quality standards, and consistent execution."
-            }
-        ]
-        for idx, t in enumerate(templates):
-            q_id = f"q_{job.id}_{idx+1}"
-            existing_q = db.query(QuestionBank).filter(QuestionBank.id == q_id).first()
-            if not existing_q:
-                existing_q = QuestionBank(
-                    id=q_id,
-                    company_id=cand.company_id,
-                    title=t["title"],
-                    prompt=t["prompt"],
-                    category=t["category"] if t["category"] in ['TECHNICAL', 'HR', 'BEHAVIORAL', 'PROBLEM_SOLVING'] else 'TECHNICAL',
-                    role_category=job.department or "Technology",
-                    target_skill_level="SKILLED" if is_skilled else "UNSKILLED",
-                    difficulty=t["difficulty"],
-                    expected_duration_sec=t["expected_duration_sec"],
-                    ideal_benchmark_answer=t["benchmark"],
-                    key_concepts=["experience", "problem solving", "execution", "collaboration"],
-                    anti_patterns=["lack of specifics", "unclear reasoning"],
-                    rubric_weights={"technical": 0.45, "relevance": 0.30, "communication": 0.25},
-                    is_global=True,
-                    created_at=datetime.now(timezone.utc)
-                )
-                db.add(existing_q)
-                db.flush()
-            if existing_q not in round_obj.questions:
-                round_obj.questions.append(existing_q)
-                db.flush()
-
-            assigned_questions.append({
-                "id": existing_q.id,
-                "title": existing_q.title,
-                "prompt": existing_q.prompt,
-                "category": existing_q.category,
-                "difficulty": existing_q.difficulty,
-                "expected_duration_sec": existing_q.expected_duration_sec
-            })
-        db.commit()
-
     return {
+        "success": True,
+        "message": "Interview session successfully authorized and initialized.",
         "session_id": session.id,
         "candidate": {
             "id": cand.id,

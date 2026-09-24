@@ -107,7 +107,7 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
     }
 
     const targetJob = jobs.find(j => j.id === assignedJobId) || jobs[0];
-    const companyId = currentCompany?.id || targetJob?.companyId || 'comp_cyberdyne';
+    const companyId = currentCompany?.id || targetJob?.companyId || 'comp_ardhnarishwar';
 
     setInviteSubmitting(true);
     const cleanFirstName = inviteFirstName.trim();
